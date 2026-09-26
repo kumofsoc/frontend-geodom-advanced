@@ -7,18 +7,11 @@ import { PreferencePanel } from '../components/PreferencePanel'
 import { RecommendationResults } from '../components/RecommendationResults'
 import { api, isDemo } from '../lib/api'
 import { filterApartments } from '../lib/catalog'
-import {
-  defaultCatalogFilters,
-  defaultPreferences,
-  loadCatalogFilters,
-  loadPreferences,
-  saveCatalogFilters,
-  savePreferences,
-  validatePreferences
-} from '../lib/preferences'
+import { defaultPreferences, validatePreferences } from '../lib/preferences'
 import { loadLastRecommendation } from '../lib/recommendations'
 import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
+import { useGeoDomStore } from '../store/useGeoDomStore'
 
 export function Catalog() {
   const [items,setItems] = useState<Apartment[]>([])
@@ -27,22 +20,29 @@ export function Catalog() {
   const [geoObjects,setGeoObjects] = useState<GeoObject[]>([])
   const [geoError,setGeoError] = useState('')
   const [params,setParams] = useSearchParams()
-  const [filtersOpen,setFiltersOpen] = useState(false)
-  const [workPicking,setWorkPicking] = useState(false)
-  const [filters,setFilters] = useState<CatalogFilters>(() => {
-    const saved = loadCatalogFilters()
-    return {
-      ...saved,
-      district:params.get('district') ?? saved.district,
-      query:params.get('q') ?? saved.query
-    }
-  })
-  const [preferences,setPreferences] = useState<RecommendationRequest>(loadPreferences)
+  const preferences = useGeoDomStore(state => state.preferences)
+  const filters = useGeoDomStore(state => state.filters)
+  const filtersOpen = useGeoDomStore(state => state.filtersOpen)
+  const workPicking = useGeoDomStore(state => state.workPicking)
+  const setPreferences = useGeoDomStore(state => state.setPreferences)
+  const setFilter = useGeoDomStore(state => state.setFilter)
+  const resetFilters = useGeoDomStore(state => state.resetFilters)
+  const resetPreferencesState = useGeoDomStore(state => state.resetPreferences)
+  const setFiltersOpen = useGeoDomStore(state => state.setFiltersOpen)
+  const setWorkPicking = useGeoDomStore(state => state.setWorkPicking)
+  const setWorkLocation = useGeoDomStore(state => state.setWorkLocation)
   const [response,setResponse] = useState<RecommendationResponse|null>(loadLastRecommendation)
   const [recommendationLoading,setRecommendationLoading] = useState(() => !loadLastRecommendation())
   const [recommendationError,setRecommendationError] = useState('')
   const [validationError,setValidationError] = useState('')
   const priorityRecalcReady = useRef(false)
+
+  useEffect(() => {
+    const district = params.get('district')
+    const query = params.get('q')
+    if (district !== null) setFilter('district',district)
+    if (query !== null) setFilter('query',query)
+  },[])
 
   useEffect(() => {
     api.list().then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false))
@@ -52,7 +52,7 @@ export function Catalog() {
   useEffect(() => {
     const saved = loadLastRecommendation()
     if (!saved) setRecommendationLoading(true)
-    api.recommend(loadPreferences())
+    api.recommend(preferences)
       .then(setResponse)
       .catch(e => {
         const message = e instanceof Error ? e.message : 'Сервер рекомендаций недоступен'
@@ -62,8 +62,6 @@ export function Catalog() {
       .finally(() => setRecommendationLoading(false))
   },[])
 
-  useEffect(() => { savePreferences(preferences) },[preferences])
-  useEffect(() => { saveCatalogFilters(filters) },[filters])
   const prioritySignature = Object.values(preferences.priorities).join(':')
   useEffect(() => {
     if (!priorityRecalcReady.current) {
@@ -110,11 +108,11 @@ export function Catalog() {
   }).sort((a,b) => b.score-a.score).slice(0,3),[items,districts,personalScores])
 
   function change<K extends keyof CatalogFilters>(key:K,value:CatalogFilters[K]) {
-    setFilters(prev => ({ ...prev,[key]:value }))
+    setFilter(key,value)
   }
 
   function reset() {
-    setFilters(defaultCatalogFilters)
+    resetFilters()
     setParams({})
   }
 
@@ -139,8 +137,7 @@ export function Catalog() {
   }
 
   function chooseWorkLocation(location:{ lat:number; lon:number }) {
-    setPreferences(current => ({ ...current,work_location:location }))
-    setWorkPicking(false)
+    setWorkLocation(location)
   }
 
   async function recommend(value:RecommendationRequest) {
@@ -165,7 +162,6 @@ export function Catalog() {
       return false
     }
     setValidationError('')
-    savePreferences(preferences)
     change('maxPrice',preferences.budget_max)
     await recommend(preferences)
     document.getElementById('recommendations')?.scrollIntoView({behavior:'smooth',block:'start'})
@@ -174,10 +170,8 @@ export function Catalog() {
 
   function resetPreferences() {
     reset()
-    setPreferences(defaultPreferences)
-    setWorkPicking(false)
+    resetPreferencesState()
     setValidationError('')
-    savePreferences(defaultPreferences)
     void recommend(defaultPreferences)
   }
 
