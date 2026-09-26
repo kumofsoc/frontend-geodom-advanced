@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Building2, ChevronDown, CircleHelp, MapPin, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BellRing, Building2, ChevronDown, CircleHelp, MapPin, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApartmentCard, EmptyState, PageLoading } from '../components/Ui'
 import { MapPanel } from '../components/MapPanel'
@@ -15,6 +15,7 @@ import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, Rec
 import { useGeoDomStore } from '../store/useGeoDomStore'
 import { KRASNOYARSK_DISTRICTS } from '../lib/krasnoyarsk'
 import { loadPromotedIds } from '../lib/pro'
+import { createSavedSearch } from '../lib/savedSearches'
 
 const CitySignal = lazy(() => import('../components/CitySignal'))
 const CATALOG_PAGE_SIZE = 24
@@ -28,6 +29,7 @@ export function Catalog() {
   const [params,setParams] = useSearchParams()
   const preferences = useGeoDomStore(state => state.preferences)
   const filters = useGeoDomStore(state => state.filters)
+  const user = useGeoDomStore(state => state.user)
   const filtersOpen = useGeoDomStore(state => state.filtersOpen)
   const workPicking = useGeoDomStore(state => state.workPicking)
   const setPreferences = useGeoDomStore(state => state.setPreferences)
@@ -41,6 +43,7 @@ export function Catalog() {
   const [recommendationLoading,setRecommendationLoading] = useState(() => !loadLastRecommendation())
   const [recommendationError,setRecommendationError] = useState('')
   const [validationError,setValidationError] = useState('')
+  const [savedSearchMessage,setSavedSearchMessage] = useState('')
   const [shownCount,setShownCount] = useState(CATALOG_PAGE_SIZE)
   const priorityRecalcReady = useRef(false)
 
@@ -190,6 +193,22 @@ export function Catalog() {
     void recommend(defaultPreferences)
   }
 
+  function saveCurrentSearch() {
+    const parts=[
+      filters.district || 'Красноярск',
+      filters.rooms ? (filters.rooms >= 4 ? '4+ комн.' : `${filters.rooms} комн.`) : '',
+      filters.maxPrice ? `до ${Math.round(filters.maxPrice/1_000_000*10)/10} млн` : ''
+    ].filter(Boolean)
+    createSavedSearch({
+      label:parts.join(' · '),
+      preferences,
+      filters,
+      items
+    })
+    setSavedSearchMessage(`Поиск сохранён. Сейчас ему соответствуют ${visible.length} квартир.`)
+    window.setTimeout(() => setSavedSearchMessage(''),3200)
+  }
+
   const activeCount = Number(!!filters.district)+Number(!!filters.maxPrice)+Number(!!filters.rooms)+Number(!!filters.minArea)+Number(!!filters.yearFrom)+Number(!!filters.buildingType)+Number(filters.onlyWithPhotos)
   const filterChips = [
     filters.district ? { key:'district',label:`Район: ${filters.district}`,clear:() => change('district','') } : null,
@@ -250,6 +269,7 @@ export function Catalog() {
             <div><span className="map-tab active"><MapPin size={16}/> Яндекс Карта</span><span className="map-tab secondary">Красноярск и районы</span></div>
             <div className="map-topbar-note"><span className="pulse-dot"/> {workPicking ? 'Выберите место работы' : `${visible.length} из ${items.length} подходят фильтрам · все показаны`}</div>
           </div>
+          {savedSearchMessage && <div className="saved-search-toast"><BellRing size={14}/>{savedSearchMessage}</div>}
           {loading
             ? <PageLoading/>
             : error
@@ -293,6 +313,9 @@ export function Catalog() {
           <div className="dashboard-section-title listings-title">
             <div><h2>Все <span>квартиры</span></h2><p>{loading ? 'Загружаем предложения…' : `${visible.length} предложений · показано ${Math.min(shownCount,visible.length)}`}</p></div>
             <div className="listings-actions">
+              {user
+                ? <button type="button" className="save-search-button" onClick={saveCurrentSearch}><BellRing size={15}/> Сохранить поиск</button>
+                : <Link className="save-search-button" to="/login?next=/"><BellRing size={15}/> Сохранить поиск</Link>}
               <button className="mobile-filter-button" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17}/> Параметры {activeCount > 0 && <b>{activeCount}</b>}</button>
               <label htmlFor="sort">Сортировка</label>
               <div className="select-wrap">
