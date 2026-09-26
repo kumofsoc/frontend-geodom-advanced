@@ -152,3 +152,24 @@ docker compose up -d
 ```
 
 По умолчанию frontend доступен на `http://localhost:3000`, health check — `/healthz`. Временные локальные фото монтируются из `./public/media` read-only и не встраиваются в каждый слой image. Детали и план подключения Go container: `docs/docker.md`.
+
+
+## Finance and GeoDom Pro
+
+Apartment detail now contains two frontend decision tools:
+
+- a Krasnoyarsk mortgage directory/calculator using a dated public snapshot of secondary-housing bank offers, plus a custom-rate mode;
+- a configurable buy-vs-rent model that compares home equity with a renter investment scenario over a chosen horizon.
+
+Bank conditions are not live quotes and are never treated as approval. Each bank entry carries a source and update date.
+
+Authenticated demo users can also open `/pro`:
+
+- CRM-style qualified lead matching against their own listings;
+- consent-gated synthetic contact reveal;
+- paid-promotion demo persisted locally;
+- a clearly labelled sponsored catalog slot that does not modify organic recommendation score;
+- developer B2B demo;
+- aggregated GeoDom Analytics demo.
+
+The commercial/product model and privacy boundaries are documented in `docs/monetization.md`.
