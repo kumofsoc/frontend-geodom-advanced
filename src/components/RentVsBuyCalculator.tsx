@@ -6,6 +6,7 @@ import { KRASNOYARSK_MORTGAGE_BANKS,mortgageOfferEligibility } from '../lib/mort
 import { api,isDemo } from '../lib/api'
 import { AssumptionsDrawer,DataFreshness,SourceBadge,WarningBanner } from './DataTrust'
 import type { RentVsBuyBackendResponse } from '../types'
+import { saveRentVsBuyDecision } from '../lib/decisionSnapshot'
 
 export type RentVsBuyInput = {
   apartmentPrice:number
@@ -136,7 +137,11 @@ export function RentVsBuyCalculator({apartmentPrice,defaultDownPayment=0}:{apart
       setLoading(true)
       setError('')
       api.rentVsBuy(requestBody,controller.signal)
-        .then(value => { if (!controller.signal.aborted) setResult(value) })
+        .then(value => {
+          if (controller.signal.aborted) return
+          setResult(value)
+          saveRentVsBuyDecision({apartmentPrice,request:requestBody,result:value,savedAt:new Date().toISOString()})
+        })
         .catch(err => {
           if (controller.signal.aborted) return
           setResult(null)
