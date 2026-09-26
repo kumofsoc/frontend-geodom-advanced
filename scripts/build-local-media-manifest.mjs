@@ -1,4 +1,4 @@
-import { existsSync,mkdirSync,readdirSync,readFileSync,statSync,writeFileSync } from 'node:fs'
+import { existsSync,mkdirSync,readdirSync,readFileSync,writeFileSync } from 'node:fs'
 import { dirname,extname,join,resolve } from 'node:path'
 
 const input=resolve(process.argv[2] || 'local-data/media.jsonl')
