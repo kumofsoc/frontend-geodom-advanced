@@ -88,16 +88,26 @@ export function Catalog() {
   const districts = useMemo(() => [...new Set(items.map(x => x.district.name))].filter(x => x !== 'Уточняется').sort(),[items])
   const visible = useMemo(() => filterApartments(items,filters),[items,filters])
   const visibleIds = useMemo(() => new Set(visible.map(item => String(item.id))),[visible])
+  const personalScores = useMemo(() => new Map(
+    (response?.items ?? []).map(item => [String(item.apartment_id),item.score] as const)
+  ),[response])
   const districtCards = useMemo(() => districts.map(name => {
     const group = items.filter(x => x.district.name === name)
+    const scores = group.map(item => {
+      const personal = personalScores.get(String(item.id))
+      if (typeof personal === 'number' && Number.isFinite(personal)) return personal
+      const fallback = item.recommendation.score
+      if (fallback === null || !Number.isFinite(fallback)) return null
+      return fallback > 10 ? fallback/10 : fallback
+    }).filter((value):value is number => value !== null)
     return {
       name,
       count:group.length,
-      score:Math.round(group.reduce((sum,x) => sum+(x.recommendation.score || 0),0)/group.length),
+      score:scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : 0,
       photo:group[0]?.photos[0]?.url,
       description:group[0]?.district.description
     }
-  }).sort((a,b) => b.score-a.score).slice(0,3),[items,districts])
+  }).sort((a,b) => b.score-a.score).slice(0,3),[items,districts,personalScores])
 
   function change<K extends keyof CatalogFilters>(key:K,value:CatalogFilters[K]) {
     setFilters(prev => ({ ...prev,[key]:value }))
@@ -223,6 +233,7 @@ export function Catalog() {
                   items={items}
                   geoObjects={geoObjects}
                   activeApartmentIds={visibleIds}
+                  scoreByApartment={personalScores}
                   selectedDistrict={filters.district}
                   onDistrict={setDistrict}
                   workLocation={preferences.work_location}
@@ -240,7 +251,7 @@ export function Catalog() {
         </div>
         <div className="district-cards">{districtCards.map((d,i) => <button className={`district-card ${filters.district === d.name ? 'chosen' : ''}`} key={d.name} onClick={() => pickDistrict(d.name)}>
           <div className="district-image">{d.photo && <img src={d.photo} alt=""/>}<span>{i === 0 ? '✦ Высокая оценка' : `${d.count} предложений`}</span></div>
-          <div className="district-card-head"><h3>{d.name}</h3><b><Sparkles size={16}/>{(d.score/10).toFixed(1)} <small>/ 10</small></b></div>
+          <div className="district-card-head"><h3>{d.name}</h3><b><Sparkles size={16}/>{d.score.toFixed(1)} <small>/ 10</small></b></div>
           <p>{d.description}</p>
           <div className="district-card-bottom">Смотреть квартиры <ArrowRight size={16}/></div>
         </button>)}</div>
