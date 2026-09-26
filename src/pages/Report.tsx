@@ -81,7 +81,7 @@ export function Report() {
       <div className="report-candidates">{top.map((item,index) => <article key={String(item.apartment_id)}>
         <div className="report-rank">#{index+1}</div>
         <div className="report-candidate-main"><span>ПЕРСОНАЛЬНЫЙ SCORE</span><h3>{item.title}</h3><strong>{price(item.price)}</strong><p>{item.reasons.slice(0,2).join(' · ') || 'Причины рекомендации не переданы'}</p></div>
-        <div className="report-score"><Sparkles size={16}/><b>{item.score.toFixed(1)}</b><small>/ 10</small></div>
+        <div className="report-score"><Sparkles size={16}/><b>{item.score === null ? 'Нет данных' : item.score.toFixed(1)}</b><small>/ 10</small></div>
       </article>)}</div>
     </section>
 
