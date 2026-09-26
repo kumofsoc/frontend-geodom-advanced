@@ -17,6 +17,10 @@ export const defaultCatalogFilters: CatalogFilters = {
   district:'',
   maxPrice:0,
   rooms:0,
+  minArea:0,
+  yearFrom:0,
+  buildingType:'',
+  onlyWithPhotos:false,
   query:'',
   sort:'recommended'
 }
@@ -48,11 +52,17 @@ export function loadCatalogFilters(): CatalogFilters {
     const saved = JSON.parse(localStorage.getItem(filtersKey) || '') as Partial<CatalogFilters>
     const maxPrice = Number(saved.maxPrice)
     const rooms = Number(saved.rooms)
+    const minArea = Number(saved.minArea)
+    const yearFrom = Number(saved.yearFrom)
     return {
       ...defaultCatalogFilters,
       ...saved,
       maxPrice:Number.isFinite(maxPrice) && maxPrice >= 0 ? maxPrice : 0,
       rooms:Number.isInteger(rooms) && rooms >= 0 ? rooms : 0,
+      minArea:Number.isFinite(minArea) && minArea >= 0 ? minArea : 0,
+      yearFrom:Number.isInteger(yearFrom) && yearFrom >= 0 ? yearFrom : 0,
+      buildingType:typeof saved.buildingType === 'string' ? saved.buildingType : '',
+      onlyWithPhotos:Boolean(saved.onlyWithPhotos),
       sort:['recommended','price_asc','price_desc','area_desc'].includes(String(saved.sort)) ? saved.sort as CatalogFilters['sort'] : 'recommended'
     }
   } catch {
