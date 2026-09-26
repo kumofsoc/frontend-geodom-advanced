@@ -114,7 +114,7 @@ export function Compare() {
               {coverUrl ? <img src={coverUrl} alt={apartment?.title || recommendationItem?.title || 'Квартира'} loading="lazy"/> : <div className="image-placeholder">GEODOM</div>}
             </Link>
             <div>
-              {recommendationItem && <span className="compare-object-score"><Sparkles size={14}/> {recommendationItem.score.toFixed(1)} / 10</span>}
+              {recommendationItem && <span className="compare-object-score"><Sparkles size={14}/> {recommendationItem.score === null ? 'Нет данных' : `${recommendationItem.score.toFixed(1)} / 10`}</span>}
               <Link to={`/apartments/${id}`} className="compare-object-title">{apartment?.title || recommendationItem?.title || `Квартира ${id}`} <ArrowUpRight size={14}/></Link>
               {state?.error && <small className="compare-object-error">{state.error}</small>}
             </div>
