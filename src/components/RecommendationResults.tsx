@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, GitCompareArrows, Sparkles, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
