@@ -44,6 +44,6 @@ for (const row of rows) {
 for (const items of Object.values(groups)) items.sort((a,b) => a.order-b.order)
 
 mkdirSync(dirname(output),{ recursive:true })
-const source=`// Generated from local media.jsonl. Temporary frontend-only bridge.\nexport const localHousingMedia = ${JSON.stringify(groups,null,2)} as const\n`
+const source=`// Generated from local media.jsonl. Temporary frontend-only bridge.\nexport const localHousingMedia = ${JSON.stringify(groups,null,2)} as Record<string, Array<{ id:string; url:string; order:number; is_cover:boolean; storage_key?:string; local_path?:string; attribution?:string; rights_status?:string; publication_allowed?:boolean }>>\n`
 writeFileSync(output,source)
 console.log(`Wrote ${Object.keys(groups).length} apartment media groups to ${output}`)
