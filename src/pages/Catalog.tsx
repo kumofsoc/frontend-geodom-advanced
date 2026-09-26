@@ -6,13 +6,14 @@ import { MapPanel } from '../components/MapPanel'
 import { PreferencePanel } from '../components/PreferencePanel'
 import { RecommendationResults } from '../components/RecommendationResults'
 import { Reveal } from '../components/MotionPrimitives'
-import { api, isDemo } from '../lib/api'
+import { api } from '../lib/api'
 import { filterApartments } from '../lib/catalog'
 import { defaultPreferences, validatePreferences } from '../lib/preferences'
 import { loadLastRecommendation } from '../lib/recommendations'
 import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
 import { useGeoDomStore } from '../store/useGeoDomStore'
+import { KRASNOYARSK_DISTRICTS } from '../lib/krasnoyarsk'
 
 const CitySignal = lazy(() => import('../components/CitySignal'))
 const CATALOG_PAGE_SIZE = 24
@@ -224,7 +225,7 @@ export function Catalog() {
           </div>
           <div className="intro-badge">
             <span className="intro-badge-icon"><Building2 size={22}/></span>
-            <div><b>{districts.length || '—'} районов</b><small>для осознанного выбора</small></div>
+            <div><b>{KRASNOYARSK_DISTRICTS.length} районов</b><small>для осознанного выбора</small></div>
             <ArrowUpRight size={16}/>
           </div>
           <Suspense fallback={null}><CitySignal/></Suspense>
@@ -270,7 +271,7 @@ export function Catalog() {
         <Reveal>
         <div className="dashboard-section-title">
           <div><h2>Районы <span>Красноярска</span></h2><p>Обзор квартир и инфраструктуры по районам</p></div>
-          <span className="mini-label">{isDemo ? 'ДЕМОНСТРАЦИОННЫЕ ОЦЕНКИ' : 'ОБЗОР РАЙОНОВ'}</span>
+          <Link className="districts-all-link" to="/districts">Все 7 районов <ArrowRight size={14}/></Link>
         </div>
         <div className="district-cards">{districtCards.map((d,i) => <button className={`district-card ${filters.district === d.name ? 'chosen' : ''}`} key={d.name} onClick={() => pickDistrict(d.name)}>
           <div className="district-image">{d.photo && <img src={d.photo} alt=""/>}<span>{i === 0 ? '✦ Высокая оценка' : `${d.count} предложений`}</span></div>
