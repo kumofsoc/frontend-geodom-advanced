@@ -51,6 +51,7 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
   const [bankId,setBankId]=useState('sber')
   const [childrenCount,setChildrenCount]=useState(1)
   const [youngestChildAge,setYoungestChildAge]=useState<number|null>(3)
+  const [bankDirectoryOpen,setBankDirectoryOpen]=useState(false)
 
   const programContext=useMemo(() => ({ childrenCount,youngestChildAge,apartmentArea }),[childrenCount,youngestChildAge,apartmentArea])
   const programs=useMemo(() => MORTGAGE_PROGRAM_ORDER.map(id => resolveMortgageProgram(id,programContext)),[programContext])
@@ -160,26 +161,43 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
         {programReasons.length > 0 && <div className="mortgage-fit-warning"><div><BadgePercent size={16}/><span><b>Текущие параметры не проходят</b>{programReasons.join(' · ')}</span></div>{programId !== 'far-east' && <button type="button" onClick={fitProgram}>{programId === 'market' ? 'Подогнать к банку' : 'Подогнать взнос и срок'}</button>}</div>}
       </div>
 
-      <aside className="mortgage-summary-card">
-        <span className="mortgage-summary-label">Ежемесячный платёж</span>
-        <strong>{calculationAvailable ? formatPrice(Math.round(result!.monthlyPayment)) : '—'}</strong>
-        <small>{annualRate === null ? 'Укажите ставку' : annualRate+'% годовых · аннуитет'}</small>
+      <aside className="mortgage-summary-card" aria-live="polite">
+        <div className="mortgage-summary-head">
+          <div className="mortgage-summary-program">
+            <span>{programIcon(programId)}</span>
+            <div><small>Расчёт по программе</small><b>{programId === 'market' ? selectedBankOffer.bank : selectedProgram.title}</b></div>
+          </div>
+          <span className={calculationAvailable ? 'mortgage-summary-state ready' : 'mortgage-summary-state'}>{calculationAvailable ? 'Расчёт готов' : 'Нужны параметры'}</span>
+        </div>
+
+        <div className="mortgage-summary-payment">
+          <span>Ежемесячный платёж</span>
+          <strong>{calculationAvailable ? formatPrice(Math.round(result!.monthlyPayment)) : '—'}</strong>
+          <small>{annualRate === null ? 'Укажите ставку' : annualRate+'% годовых · аннуитет'}</small>
+        </div>
+
         <div className="mortgage-summary-grid">
           <div><span>Сумма кредита</span><b>{formatPrice(Math.round(principal))}</b></div>
           <div><span>Первый взнос</span><b>{formatPrice(Math.round(downPayment))}</b></div>
           <div><span>Переплата</span><b>{calculationAvailable ? formatPrice(Math.round(result!.overpayment)) : '—'}</b></div>
           <div><span>Всего выплат</span><b>{calculationAvailable ? formatPrice(Math.round(result!.totalPayment)) : '—'}</b></div>
         </div>
-        <div className="mortgage-summary-program"><span>{programIcon(programId)}</span><div><small>Программа</small><b>{programId === 'market' ? selectedBankOffer.bank : selectedProgram.title}</b></div></div>
-        {calculationAvailable ? <div className="mortgage-summary-ok">Расчёт готов. Это ориентир, а не одобрение банка.</div> : <div className="mortgage-summary-error">{programReasons[0] || 'Для расчёта заполните ставку.'}</div>}
+
+        <div className={calculationAvailable ? 'mortgage-summary-message ready' : 'mortgage-summary-message error'}>
+          {calculationAvailable ? 'Ориентировочный расчёт. Финальные условия подтвердит банк.' : programReasons[0] || 'Для расчёта заполните ставку.'}
+        </div>
       </aside>
     </div>
 
-    {programId === 'market' && <details className="mortgage-bank-directory mortgage-v2-bank-directory">
+    {programId === 'market' && <details
+      className="mortgage-bank-directory mortgage-v2-bank-directory"
+      open={bankDirectoryOpen}
+      onToggle={event => setBankDirectoryOpen(event.currentTarget.open)}
+    >
       <summary><span>Сравнить банки Красноярска</span><b>{eligibleBanks} подходят под текущие параметры</b></summary>
-      <div className="mortgage-bank-list">{bankRows.map(({offer,eligibility,result:bankResult}) => <button type="button" key={offer.id} className={bankId === offer.id ? 'selected' : ''} onClick={() => setBankId(offer.id)}>
+      {bankDirectoryOpen && <div className="mortgage-bank-list">{bankRows.map(({offer,eligibility,result:bankResult}) => <button type="button" key={offer.id} className={bankId === offer.id ? 'selected' : ''} onClick={() => setBankId(offer.id)}>
         <span className="mortgage-bank-logo">{offer.bank.slice(0,2).toUpperCase()}</span><span className="mortgage-bank-copy"><b>{offer.bank}</b><small>{offer.program}</small></span><span className="mortgage-bank-rate">{offer.rateFrom === null ? '—' : offer.rateFrom+'%'}<small>{offer.minDownPaymentPercent === null ? 'взнос уточнить' : 'взнос от '+offer.minDownPaymentPercent+'%'}</small></span><span className={bankResult ? 'mortgage-bank-payment' : 'mortgage-bank-payment unavailable'}>{bankResult ? formatPrice(Math.round(bankResult.monthlyPayment))+'/мес' : eligibility.reasons[0] || 'Уточнить'}</span>
-      </button>)}</div>
+      </button>)}</div>}
       <div className="mortgage-snapshot-note">Snapshot на {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}. Рыночные ставки меняются; перед сделкой проверьте источник выбранного банка.</div>
     </details>}
 
