@@ -18,11 +18,18 @@
 .yandex-apartment-dot{width:10px;height:10px;border-radius:50%;transform:translate3d(-50%,-50%,0);background:#2e84f4;border:2px solid #fff;box-shadow:0 2px 7px #193e7945;backface-visibility:hidden}
 .yandex-apartment-dot.muted{opacity:.28}
 .yandex-apartment-dot:hover{box-shadow:0 3px 10px #193e7960}
-.yandex-price-pin{transform:translate3d(-50%,-100%,0);display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:32px;padding:0 11px;background:#fff;color:#146ae0;border:2px solid #2e84f4;box-shadow:0 5px 14px #193e7938;border-radius:18px;font:800 10px/1 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;will-change:auto;user-select:none;contain:layout paint;transition:opacity .14s,border-color .14s,box-shadow .14s}
+.yandex-price-pin{transform:translate3d(-50%,-100%,0);display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:32px;padding:0 11px;background:#fff;color:#146ae0;border:2px solid #2e84f4;box-shadow:0 5px 14px #193e7938;border-radius:18px;font:800 10px/1 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;user-select:none;contain:layout paint;transition:opacity .12s,border-color .12s,box-shadow .12s,background .12s}
 .yandex-price-pin span{pointer-events:none}
-.yandex-price-pin:hover{border-color:#0f6fe8;box-shadow:0 7px 18px #193e7952}
-.yandex-price-pin.muted{opacity:.28}
-.yandex-price-pin.muted:hover{opacity:.52}
+.yandex-price-pin .price-short{display:none}
+.yandex-price-pin.compact{min-width:54px;height:25px;padding:0 8px;border-width:1.5px;border-radius:14px;font-size:8.5px;box-shadow:0 3px 9px #193e792d}
+.yandex-price-pin.compact .price-short{display:inline}
+.yandex-price-pin.compact .price-full{display:none}
+.yandex-price-pin:hover{background:#f8fbff;border-color:#075fc8;box-shadow:0 10px 26px #102f5a66}
+.yandex-price-pin.compact:hover{min-width:88px;height:32px;padding:0 11px;border-width:2px;font-size:10px}
+.yandex-price-pin.compact:hover .price-short{display:none}
+.yandex-price-pin.compact:hover .price-full{display:inline}
+.yandex-price-pin.muted{opacity:.22}
+.yandex-price-pin.muted:hover{opacity:1}
 .yandex-district-pin{transform:translate3d(-50%,-100%,0);min-width:116px;display:grid;justify-items:center;gap:3px;background:#09a66b;color:#fff;padding:9px 12px 8px;border-radius:10px;box-shadow:0 8px 20px #0f644d42;font:800 10px/1.15 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;user-select:none}
 .yandex-district-pin>span{font-size:10px;letter-spacing:.1px}.yandex-district-pin>div{display:flex;align-items:baseline;gap:3px}.yandex-district-pin b{font-size:18px}.yandex-district-pin em{font-style:normal;font-size:8px;opacity:.75}.yandex-district-pin small{font-size:7.5px;font-weight:700;opacity:.82}
 .yandex-district-pin.active{background:#087c51;outline:3px solid #b9eed8}
