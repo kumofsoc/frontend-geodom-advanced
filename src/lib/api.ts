@@ -3,6 +3,8 @@ import { demoGeoRows } from '../data/demoGeoObjects'
 import { demoRecommend, logDemoEvent, normalizeRecommendation, rememberRecommendation } from './recommendations'
 import { normalizeGeoObjects, type GeoObject } from './dataSanitizers'
 import { buildDistrictStats, type DistrictStats } from './districtStats'
+import type { SharedDemandProfile } from './demandProfile'
+import type { LeadStage, ProLead } from './pro'
 import { createId, demoPasswordDigest, matchesDemoPassword } from './id'
 import { withLocalHousingMedia } from './media'
 import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
@@ -13,7 +15,57 @@ const homesKey = 'geodom-demo-apartments-v1'
 const usersKey = 'geodom-demo-users-v1'
 const sessionKey = 'geodom-session-v1'
 const delay = () => new Promise(resolve => setTimeout(resolve, 180))
+
+type BackendDemandProfile = {
+  user_id:number
+  name?:string
+  intent:'buy'|'rent'
+  budget_max:number
+  monthly_rent_max?:number|null
+  district_names:string[]
+  rooms_min:number
+  rooms_max:number
+  max_commute_minutes:number
+  priorities:string[]
+  work_label:string
+  work_location?:{lat:number;lon:number}|null
+  contact?:string
+  consent_to_contact:boolean
+  active:boolean
+  created_at:string
+  updated_at:string
+}
+
+type BackendProLead = {
+  user_id:number
+  name:string
+  intent:'buy'|'rent'
+  budget_max:number
+  monthly_rent_max?:number|null
+  district_names:string[]
+  rooms_min:number
+  rooms_max:number
+  max_commute_minutes:number
+  priorities:string[]
+  work_label:string
+  consent_to_contact:boolean
+  contact?:string
+  match_score:number
+  reasons:string[]
+  stage:LeadStage
+  created_at:string
+}
+
+type ProAccountStatus = {
+  user_id:number|string
+  status:'none'|'trial'|'active'|'expired'|'disabled'
+  trial_until?:string|null
+}
 function read<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(key) || '') as T } catch { return fallback } }
+function loadDemandProfileForDemo():SharedDemandProfile|null {
+  const value=read<SharedDemandProfile|null>('geodom-shared-demand-profile-v1',null)
+  return value && typeof value.id==='string' ? value : null
+}
 function save(key: string, value: unknown) { localStorage.setItem(key, JSON.stringify(value)) }
 function getSession(): { user: User; token: string } | null { try { return JSON.parse(sessionStorage.getItem(sessionKey) || '') } catch { return null } }
 const storeSession = (session: { user: User; token: string } | null) => session ? sessionStorage.setItem(sessionKey, JSON.stringify(session)) : sessionStorage.removeItem(sessionKey)
@@ -34,6 +86,63 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
 function backendListingPayload(input:ListingInput) {
   return { ...input }
+}
+
+function fromBackendDemandProfile(raw:BackendDemandProfile,user:User):SharedDemandProfile {
+  return {
+    id:`backend:${raw.user_id}`,
+    userId:String(raw.user_id),
+    name:raw.name || user.login,
+    contact:raw.contact || '',
+    consentToContact:Boolean(raw.consent_to_contact),
+    budgetMax:Number(raw.budget_max || 0),
+    districts:Array.isArray(raw.district_names) ? raw.district_names : [],
+    roomsMin:Number(raw.rooms_min || 0),
+    roomsMax:Number(raw.rooms_max || 0),
+    maxCommuteMinutes:Number(raw.max_commute_minutes || 0),
+    priorities:Array.isArray(raw.priorities) ? raw.priorities : [],
+    workLocation:raw.work_location ?? null,
+    createdAt:raw.created_at,
+    updatedAt:raw.updated_at
+  }
+}
+
+function toBackendDemandProfile(profile:SharedDemandProfile) {
+  return {
+    intent:'buy',
+    budget_max:profile.budgetMax,
+    monthly_rent_max:null,
+    district_names:profile.districts,
+    rooms_min:profile.roomsMin,
+    rooms_max:profile.roomsMax,
+    max_commute_minutes:profile.maxCommuteMinutes,
+    priorities:profile.priorities,
+    work_label:profile.workLocation ? `${profile.workLocation.lat.toFixed(5)}, ${profile.workLocation.lon.toFixed(5)}` : '',
+    work_location:profile.workLocation,
+    contact:profile.contact,
+    consent_to_contact:profile.consentToContact,
+    active:true
+  }
+}
+
+function fromBackendProLead(raw:BackendProLead):ProLead {
+  return {
+    id:`user:${raw.user_id}`,
+    name:raw.name || `Пользователь ${raw.user_id}`,
+    intent:raw.intent,
+    budgetMax:Number(raw.budget_max || 0),
+    monthlyRentMax:raw.monthly_rent_max ?? undefined,
+    districts:Array.isArray(raw.district_names) ? raw.district_names : [],
+    roomsMin:Number(raw.rooms_min || 0),
+    roomsMax:Number(raw.rooms_max || 0),
+    maxCommuteMinutes:Number(raw.max_commute_minutes || 0),
+    priorities:Array.isArray(raw.priorities) ? raw.priorities : [],
+    workLabel:raw.work_label || 'Место работы не задано',
+    createdAt:raw.created_at,
+    consentToContact:Boolean(raw.consent_to_contact),
+    contact:raw.contact || '',
+    source:'backend'
+  }
 }
 
 async function imageData(file: File): Promise<string> {
@@ -92,6 +201,50 @@ export const api = {
       minPrice:row.min_price ?? null,
       maxPrice:row.max_price ?? null
     }))
+  },
+  async demandProfile(): Promise<SharedDemandProfile|null> {
+    if (isDemo) return loadDemandProfileForDemo()
+    const user=getSession()?.user
+    if (!user) return null
+    const raw=await request<BackendDemandProfile|null>('/api/demand-profile')
+    return raw ? fromBackendDemandProfile(raw,user) : null
+  },
+  async saveDemandProfile(profile:SharedDemandProfile): Promise<SharedDemandProfile> {
+    if (isDemo) return profile
+    const user=getSession()?.user
+    if (!user) throw new Error('Для публикации профиля поиска войдите в аккаунт')
+    const raw=await request<BackendDemandProfile>('/api/demand-profile',{method:'PUT',body:JSON.stringify(toBackendDemandProfile(profile))})
+    return fromBackendDemandProfile(raw,user)
+  },
+  async deleteDemandProfile(): Promise<void> {
+    if (isDemo) return
+    await request<void>('/api/demand-profile',{method:'DELETE'})
+  },
+  async proStatus(): Promise<ProAccountStatus> {
+    if (isDemo) return {user_id:getSession()?.user.id || 'demo',status:'active'}
+    return request<ProAccountStatus>('/api/pro/status')
+  },
+  async startProTrial(): Promise<ProAccountStatus> {
+    if (isDemo) return {user_id:getSession()?.user.id || 'demo',status:'trial'}
+    return request<ProAccountStatus>('/api/pro/trial',{method:'POST',body:'{}'})
+  },
+  async proLeads(apartmentId:string): Promise<Array<{lead:ProLead;score:number;reasons:string[];stage:LeadStage}>> {
+    if (isDemo) return []
+    const rows=await request<BackendProLead[]>(`/api/pro/leads?apartment_id=${encodeURIComponent(apartmentId)}`)
+    return rows.map(row=>({lead:fromBackendProLead(row),score:Number(row.match_score || 0),reasons:row.reasons || [],stage:row.stage || 'new'}))
+  },
+  async setProLeadStage(apartmentId:string,leadId:string,stage:LeadStage): Promise<void> {
+    if (isDemo) return
+    const leadUserId=leadId.replace(/^user:/,'')
+    await request<void>(`/api/pro/leads/${encodeURIComponent(leadUserId)}/stage`,{method:'PUT',body:JSON.stringify({apartment_id:Number(apartmentId),stage})})
+  },
+  async promote(apartmentId:string,days=7): Promise<void> {
+    if (isDemo) return
+    await request(`/api/pro/promotions/${encodeURIComponent(apartmentId)}`,{method:'POST',body:JSON.stringify({days})})
+  },
+  async cancelPromotion(apartmentId:string): Promise<void> {
+    if (isDemo) return
+    await request<void>(`/api/pro/promotions/${encodeURIComponent(apartmentId)}`,{method:'DELETE'})
   },
   async detail(id: string): Promise<Apartment> {
     if (isDemo) {
