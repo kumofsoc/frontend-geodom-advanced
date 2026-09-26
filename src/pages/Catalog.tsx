@@ -113,8 +113,12 @@ export function Catalog() {
     setParams(filters.query ? { q:filters.query } : {})
   }
 
-  function pickDistrict(name:string) {
+  function setDistrict(name:string) {
     change('district',filters.district === name ? '' : name)
+  }
+
+  function pickDistrict(name:string) {
+    setDistrict(name)
     document.getElementById('catalog')?.scrollIntoView({behavior:'smooth',block:'start'})
   }
 
@@ -220,7 +224,7 @@ export function Catalog() {
                   geoObjects={geoObjects}
                   activeApartmentIds={visibleIds}
                   selectedDistrict={filters.district}
-                  onDistrict={pickDistrict}
+                  onDistrict={setDistrict}
                   workLocation={preferences.work_location}
                   workPicking={workPicking}
                   onWorkLocation={chooseWorkLocation}
