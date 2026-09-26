@@ -215,3 +215,13 @@
 /* Keep the hovered apartment marker visually above dense neighbors. */
 .yandex-price-pin:hover{transform:translate3d(-50%,-100%,0) scale(1.08);filter:saturate(1.08)}
 .yandex-price-pin.compact:hover{transform:translate3d(-50%,-100%,0) scale(1.08)}
+
+
+/* Mortgage calculator */
+.mortgage-calculator{margin-top:10px;padding:16px;border:1px solid #dfe8f2;border-radius:12px;background:#fff}
+.mortgage-head{display:flex;align-items:center;gap:10px;margin-bottom:13px}.mortgage-head>span{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#edf5ff;color:#2479dc}.mortgage-head small{display:block;font-size:7px;font-weight:800;letter-spacing:.8px;color:#93a5b7}.mortgage-head h3{margin:3px 0 0;font-size:13px;color:#213f5d}
+.mortgage-fields{display:grid;gap:9px}.mortgage-fields label>span{display:block;margin-bottom:5px;font-size:8px;font-weight:800;color:#6f8498}.mortgage-fields input,.mortgage-fields select{width:100%;height:38px;border:1px solid #dfe8f2;border-radius:7px;background:#f8fbfe;padding:0 9px;color:#24435f;font:700 10px Manrope,Arial,sans-serif}.mortgage-fields label>small{display:block;margin-top:4px;font-size:7px;color:#94a5b5;line-height:1.35}
+.mortgage-result{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.mortgage-result>div{padding:10px;border-radius:8px;background:#f6f9fc}.mortgage-result span,.mortgage-result b{display:block}.mortgage-result span{font-size:7px;color:#8599ac}.mortgage-result b{margin-top:4px;font-size:10px;color:#274764}.mortgage-result .primary{background:#102d50}.mortgage-result .primary span{color:#91b4d2}.mortgage-result .primary b{color:#fff;font-size:13px}
+.mortgage-note{display:flex;align-items:flex-start;gap:7px;margin:10px 0 0;padding-top:10px;border-top:1px solid #e8eef4;color:#8195a8;font-size:7.5px;line-height:1.45}.mortgage-note svg{flex:none;color:#4e82b4}
+@media(max-width:900px){.mortgage-calculator{margin-top:0}}
+@media(max-width:460px){.mortgage-result{grid-template-columns:1fr}}
