@@ -46,11 +46,13 @@ export function savePreferences(value: RecommendationRequest) {
 export function loadCatalogFilters(): CatalogFilters {
   try {
     const saved = JSON.parse(localStorage.getItem(filtersKey) || '') as Partial<CatalogFilters>
+    const maxPrice = Number(saved.maxPrice)
+    const rooms = Number(saved.rooms)
     return {
       ...defaultCatalogFilters,
       ...saved,
-      maxPrice:Number.isFinite(saved.maxPrice) && Number(saved.maxPrice) >= 0 ? Number(saved.maxPrice) : 0,
-      rooms:Number.isInteger(saved.rooms) && Number(saved.rooms) >= 0 ? Number(saved.rooms) : 0,
+      maxPrice:Number.isFinite(maxPrice) && maxPrice >= 0 ? maxPrice : 0,
+      rooms:Number.isInteger(rooms) && rooms >= 0 ? rooms : 0,
       sort:['recommended','price_asc','price_desc','area_desc'].includes(String(saved.sort)) ? saved.sort as CatalogFilters['sort'] : 'recommended'
     }
   } catch {
