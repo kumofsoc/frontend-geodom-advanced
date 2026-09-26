@@ -51,3 +51,14 @@ it('keeps at most three apartments in comparison', () => {
   useGeoDomStore.getState().toggleCompared('a2')
   expect(useGeoDomStore.getState().comparedIds).toEqual(['a1','a3'])
 })
+
+
+it('prunes comparison ids that no longer exist in the active recommendation set', () => {
+  useGeoDomStore.getState().toggleCompared('a1')
+  useGeoDomStore.getState().toggleCompared('a2')
+  useGeoDomStore.getState().toggleCompared('old')
+
+  useGeoDomStore.getState().pruneCompared(['a1','a2','a3'])
+
+  expect(useGeoDomStore.getState().comparedIds).toEqual(['a1','a2'])
+})
