@@ -15,13 +15,16 @@
 /* Yandex map + workplace picker */
 .yandex-map-wrapper{background:#dfe8f0}
 .yandex-map-wrapper.work-picking .map-canvas{cursor:crosshair}
-.yandex-price-pin{transform:translate(-50%,-100%);display:inline-flex;align-items:center;justify-content:center;min-width:86px;height:30px;padding:0 10px;background:#fff;color:#146ae0;border:2px solid #2e84f4;box-shadow:0 4px 13px #193e7940;border-radius:18px;font:800 10px/1 Manrope,Arial,sans-serif;white-space:nowrap;transition:opacity .18s,transform .18s}
-.yandex-price-pin.muted{opacity:.32}
-.yandex-district-pin{transform:translate(-50%,-100%);min-width:106px;display:grid;justify-items:center;gap:3px;background:#09a66b;color:#fff;padding:8px 11px;border-radius:9px;box-shadow:0 7px 17px #0f644d50;font:800 10px/1.15 Manrope,Arial,sans-serif;white-space:nowrap;transition:.18s}
-.yandex-district-pin b{font-size:17px}
+.yandex-price-pin{transform:translate3d(-50%,-100%,0);display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:32px;padding:0 11px;background:#fff;color:#146ae0;border:2px solid #2e84f4;box-shadow:0 5px 14px #193e7938;border-radius:18px;font:800 10px/1 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;will-change:auto;user-select:none;contain:layout paint;transition:opacity .14s,border-color .14s,box-shadow .14s}
+.yandex-price-pin span{pointer-events:none}
+.yandex-price-pin:hover{border-color:#0f6fe8;box-shadow:0 7px 18px #193e7952}
+.yandex-price-pin.muted{opacity:.28}
+.yandex-price-pin.muted:hover{opacity:.52}
+.yandex-district-pin{transform:translate3d(-50%,-100%,0);min-width:116px;display:grid;justify-items:center;gap:3px;background:#09a66b;color:#fff;padding:9px 12px 8px;border-radius:10px;box-shadow:0 8px 20px #0f644d42;font:800 10px/1.15 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;user-select:none}
+.yandex-district-pin>span{font-size:10px;letter-spacing:.1px}.yandex-district-pin>div{display:flex;align-items:baseline;gap:3px}.yandex-district-pin b{font-size:18px}.yandex-district-pin em{font-style:normal;font-size:8px;opacity:.75}.yandex-district-pin small{font-size:7.5px;font-weight:700;opacity:.82}
 .yandex-district-pin.active{background:#087c51;outline:3px solid #b9eed8}
-.yandex-district-dot{width:17px;height:17px;border-radius:50%;transform:translate(-50%,-50%);background:#0aa86c;border:3px solid #fff;box-shadow:0 3px 10px #0d624b66;transition:.18s}
-.yandex-district-dot.active{width:21px;height:21px;background:#087c51;box-shadow:0 0 0 4px #b9eed899,0 4px 12px #0d624b55}
+.yandex-district-dot{width:15px;height:15px;border-radius:50%;transform:translate3d(-50%,-50%,0);background:#0aa86c;border:3px solid #fff;box-shadow:0 3px 10px #0d624b55;backface-visibility:hidden}
+.yandex-district-dot.active{width:19px;height:19px;background:#087c51;box-shadow:0 0 0 4px #b9eed899,0 4px 12px #0d624b55}
 .work-pick-hint{position:absolute;z-index:500;left:50%;top:14px;transform:translateX(-50%);background:#102d50e8;color:#fff;border-radius:8px;padding:9px 13px;font-size:10px;font-weight:800;box-shadow:0 8px 20px #102d5038;pointer-events:none;white-space:nowrap}
 .map-load-error{position:absolute;z-index:450;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px;background:#eef4f9;color:#486581}
 .map-load-error b{font-size:14px;color:#264867}
@@ -43,8 +46,9 @@
 
 /* Infrastructure layers */
 .map-layer-panel{position:absolute;right:14px;top:14px;z-index:520;width:208px;background:#fffffff2;border:1px solid #dfe8f2;border-radius:10px;box-shadow:0 8px 24px #173d6730;padding:10px;backdrop-filter:blur(8px)}
-.map-layer-title{display:flex;align-items:center;justify-content:space-between;padding:2px 3px 8px}
+.map-layer-title{display:flex;align-items:center;justify-content:space-between;padding:2px 3px 5px}
 .map-layer-title b{font-size:10px;color:#294866}.map-layer-title small{font-size:8px;color:#8ba0b4}
+.map-lod-status{margin:0 3px 8px;padding:6px 7px;border-radius:6px;background:#f3f7fc;color:#66809a;font-size:7.5px;font-weight:700;line-height:1.35}
 .map-layer-panel>button{width:100%;display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;border:0;background:transparent;border-radius:7px;padding:7px 6px;color:#8194a7;text-align:left}
 .map-layer-panel>button:hover{background:#f2f7fc}.map-layer-panel>button.active{background:#eef6ff;color:#2e5579}
 .map-layer-panel>button span{font-size:9px;font-weight:800}.map-layer-panel>button small{font-size:8px;color:#9aabbb}
