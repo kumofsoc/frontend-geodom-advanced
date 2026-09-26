@@ -64,3 +64,20 @@ export interface RecommendationResponse {
 }
 export type InteractionEvent = 'impression' | 'click' | 'save' | 'compare' | 'report'
 export interface InteractionPayload { request_id: string; event: InteractionEvent; entity_type: 'apartment'; entity_id: string | number; position: number }
+
+export interface DistrictMarketStats {
+  id:number
+  name:string
+  apartment_count:number
+  median_price?:number
+  median_price_m2?:number
+  median_area?:number
+  photo_coverage?:number
+  min_price?:number
+  max_price?:number
+  avg_schools_1km?:number
+  avg_kindergartens_1km?:number
+  avg_parks_1km?:number
+  avg_transport_stops_1km?:number
+  updated_at?:string
+}
