@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, GitCompareArrows, Sparkles, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, FileText, GitCompareArrows, Sparkles, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useGeoDomStore } from '../store/useGeoDomStore'
@@ -45,7 +45,7 @@ export function RecommendationResults({ response, loading, error, onRetry }:{ re
     const active=toggleCompared(id)
     if (!wasCompared && active) track('compare',item,position)
   }
-  return <section className="recommendations-section" id="recommendations"><div className="dashboard-section-title recommendation-title"><div><h2>Подбор <span>для вас</span></h2><p>Результаты учитывают бюджет, семью и выбранные приоритеты</p></div>{response && <span className="mini-label">{response.items.length} ВАРИАНТОВ · {response.scoring_version}</span>}</div>
+  return <section className="recommendations-section" id="recommendations"><div className="dashboard-section-title recommendation-title"><div><h2>Подбор <span>для вас</span></h2><p>Результаты учитывают бюджет, семью и выбранные приоритеты</p></div>{response && <div className="recommendation-head-actions"><span className="mini-label">{response.items.length} ВАРИАНТОВ · {response.scoring_version}</span><Link className="report-link" to="/report"><FileText size={15}/> Отчёт</Link></div>}</div>
     {loading ? <div className="recommendation-loading"><span className="spinner"/> Подбираем варианты под ваши параметры…</div> : error ? <div className="recommendation-error"><CircleAlert size={20}/><div><b>Не удалось получить рекомендации</b><p>{error}. Общий каталог ниже доступен.</p></div><button onClick={onRetry}>Повторить</button></div> : response && <>
       {response.warnings.length > 0 && <div className="recommendation-warning"><CircleAlert size={19}/><div>{response.warnings.map(w => <p key={w}>{w}</p>)}</div></div>}
       {response.items.length ? <div className="recommendation-grid">{response.items.map((item,index) => <RecommendationCard key={String(item.apartment_id)} item={item} position={index+1} saved={saved.includes(String(item.apartment_id))} compared={compared.includes(String(item.apartment_id))} compareFull={compared.length >= 3} onImpression={() => track('impression',item,index+1)} onOpen={() => track('click',item,index+1)} onSave={() => save(item,index+1)} onCompare={() => compare(item,index+1)}/>)}</div> : <div className="recommendation-empty"><h3>В этом бюджете вариантов нет</h3><p>Увеличьте максимальную стоимость или посмотрите общий каталог ниже.</p></div>}
