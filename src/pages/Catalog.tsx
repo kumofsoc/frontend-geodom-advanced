@@ -14,6 +14,7 @@ import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
 import { useGeoDomStore } from '../store/useGeoDomStore'
 import { KRASNOYARSK_DISTRICTS } from '../lib/krasnoyarsk'
+import { loadPromotedIds } from '../lib/pro'
 
 const CitySignal = lazy(() => import('../components/CitySignal'))
 const CATALOG_PAGE_SIZE = 24
@@ -93,6 +94,8 @@ export function Catalog() {
   const buildingTypes = useMemo(() => [...new Set(items.map(item => item.building_type).filter((value):value is string => !!value))].sort(),[items])
   const visible = useMemo(() => filterApartments(items,filters),[items,filters])
   const shownApartments = useMemo(() => visible.slice(0,shownCount),[visible,shownCount])
+  const promotedIds = useMemo(() => new Set(loadPromotedIds()),[])
+  const promotedApartments = useMemo(() => visible.filter(item => promotedIds.has(item.id)).slice(0,3),[visible,promotedIds])
   const visibleIds = useMemo(() => new Set(visible.map(item => String(item.id))),[visible])
   useEffect(() => {
     setShownCount(CATALOG_PAGE_SIZE)
@@ -282,6 +285,10 @@ export function Catalog() {
         </Reveal>
 
         <Reveal>
+        {promotedApartments.length > 0 && <section className="sponsored-section" aria-label="Продвигаемые объявления">
+          <div className="sponsored-heading"><div><span>ПЛАТНОЕ ПРОДВИЖЕНИЕ</span><h2>Продвигаемые объявления</h2></div><small>Позиция здесь не меняет персональный score</small></div>
+          <div className="card-grid">{promotedApartments.map((item,index) => <ApartmentCard item={item} index={index} promoted key={item.id}/>)}</div>
+        </section>}
         <section className="listings-section" id="catalog">
           <div className="dashboard-section-title listings-title">
             <div><h2>Все <span>квартиры</span></h2><p>{loading ? 'Загружаем предложения…' : `${visible.length} предложений · показано ${Math.min(shownCount,visible.length)}`}</p></div>
