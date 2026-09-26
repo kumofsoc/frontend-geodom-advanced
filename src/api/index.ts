@@ -38,6 +38,7 @@ export const api={
     return geoApi.viewport({minLat:55.85,maxLat:56.18,minLon:92.55,maxLon:93.25,limit:1200})
   },
 
+  districts:districtsApi.directory,
   districtStats:districtsApi.stats,
   districtAnalysis:districtsApi.analysis,
   complexes:complexesApi.list,
