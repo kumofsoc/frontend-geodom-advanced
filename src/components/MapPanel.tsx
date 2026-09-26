@@ -4,6 +4,7 @@ import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
 import { validCoordinate, type GeoObject } from '../lib/dataSanitizers'
 import { loadYandexMaps } from '../lib/yandexMaps'
+import { createSpatialIndex, type SpatialBounds } from '../lib/spatialIndex'
 
 type WorkLocation = { lat:number; lon:number } | null
 type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
@@ -42,9 +43,7 @@ function score10(value: number | null) {
   return value > 10 ? value / 10 : value
 }
 
-type ViewportBounds = { minLat:number;maxLat:number;minLon:number;maxLon:number }
-
-function boundsFromYandex(value: unknown): ViewportBounds | null {
+function boundsFromYandex(value: unknown): SpatialBounds | null {
   if (!Array.isArray(value) || value.length < 2) return null
   const first = value[0]
   const second = value[1]
@@ -58,13 +57,6 @@ function boundsFromYandex(value: unknown): ViewportBounds | null {
     minLon:Math.min(lon1,lon2),
     maxLon:Math.max(lon1,lon2)
   }
-}
-
-function withinViewport(lat:number,lon:number,bounds:ViewportBounds|null,padding=.18) {
-  if (!bounds) return true
-  const latPad=(bounds.maxLat-bounds.minLat)*padding
-  const lonPad=(bounds.maxLon-bounds.minLon)*padding
-  return lat >= bounds.minLat-latPad && lat <= bounds.maxLat+latPad && lon >= bounds.minLon-lonPad && lon <= bounds.maxLon+lonPad
 }
 
 function classifyGeoObject(item: GeoObject): PoiLayer | null {
@@ -109,7 +101,7 @@ export function MapPanel({
   const fittedSignature = useRef('')
   const [ready,setReady] = useState(false)
   const [zoom,setZoom] = useState(11)
-  const [viewport,setViewport] = useState<ViewportBounds|null>(null)
+  const [viewport,setViewport] = useState<SpatialBounds|null>(null)
   const [loadError,setLoadError] = useState('')
   const [layersOpen,setLayersOpen] = useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
   const [layers,setLayers] = useState<Record<PoiLayer,boolean>>({
@@ -138,6 +130,14 @@ export function MapPanel({
     [items]
   )
   const validApartmentCount = validApartments.length
+  const apartmentIndex = useMemo(
+    () => createSpatialIndex(validApartments,item => validCoordinate(item.latitude,item.longitude),.015),
+    [validApartments]
+  )
+  const poiIndex = useMemo(
+    () => createSpatialIndex(geoObjects,item => ({ lat:item.lat,lon:item.lon }),.015),
+    [geoObjects]
+  )
   const apartmentMode:'hidden'|'cluster'|'prices' = zoom <= CITY_OVERVIEW_MAX_ZOOM
     ? 'hidden'
     : zoom < APARTMENT_CLUSTER_MIN_ZOOM
@@ -146,18 +146,13 @@ export function MapPanel({
         ? 'cluster'
         : 'prices'
   const visibleApartments = useMemo(
-    () => validApartments.filter(item => {
-      const point = validCoordinate(item.latitude,item.longitude)
-      return !!point && withinViewport(point.lat,point.lon,viewport)
-    }),
-    [validApartments,viewport]
+    () => apartmentMode === 'hidden' ? [] : apartmentIndex.query(viewport,{ padding:.18 }),
+    [apartmentIndex,viewport,apartmentMode]
   )
   const useApartmentClusters = apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
   const eligiblePoi = useMemo(
-    () => zoom >= POI_MIN_ZOOM
-      ? geoObjects.filter(item => withinViewport(item.lat,item.lon,viewport))
-      : [],
-    [geoObjects,zoom,viewport]
+    () => zoom >= POI_MIN_ZOOM ? poiIndex.query(viewport,{ padding:.18 }) : [],
+    [poiIndex,zoom,viewport]
   )
   const visiblePoi = useMemo(() => eligiblePoi.slice(0,MAX_POI_MARKS),[eligiblePoi])
 
@@ -246,10 +241,9 @@ export function MapPanel({
 
     if (apartmentMode !== 'hidden') {
       if (useApartmentClusters) {
-        const apartmentMarks:any[] = []
-        for (const item of apartmentRenderSet) {
+        const features = apartmentRenderSet.flatMap((item,index) => {
           const point = validCoordinate(item.latitude,item.longitude)
-          if (!point) continue
+          if (!point) return []
           const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
           const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
           const active = activeByFilter && activeByDistrict
@@ -258,31 +252,30 @@ export function MapPanel({
             ? personalScore
             : score10(item.recommendation.score)
 
-          apartmentMarks.push(new ymaps.Placemark(
-            [point.lat,point.lon],
-            {
+          return [{
+            type:'Feature',
+            id:`${item.id}-${index}`,
+            geometry:{ type:'Point',coordinates:[point.lat,point.lon] },
+            properties:{
               balloonContentHeader:escapeHtml(item.title),
               balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
             },
-            {
-              preset:active ? 'islands#blueCircleIcon' : 'islands#grayCircleIcon',
-              zIndex:500
+            options:{
+              preset:active ? 'islands#blueCircleIcon' : 'islands#grayCircleIcon'
             }
-          ))
-        }
+          }]
+        })
 
-        if (apartmentMarks.length) {
-          const clusterer = new ymaps.Clusterer({
-            preset:'islands#blueClusterIcons',
-            groupByCoordinates:false,
-            clusterDisableClickZoom:false,
-            clusterHideIconOnBalloonOpen:false,
-            geoObjectHideIconOnBalloonOpen:false,
+        if (features.length) {
+          const objectManager = new ymaps.ObjectManager({
+            clusterize:true,
             gridSize:72,
-            minClusterSize:3
+            clusterDisableClickZoom:false,
+            geoObjectOpenBalloonOnClick:true
           })
-          clusterer.add(apartmentMarks)
-          instance.geoObjects.add(clusterer)
+          objectManager.clusters.options.set('preset','islands#blueClusterIcons')
+          objectManager.add({ type:'FeatureCollection',features })
+          instance.geoObjects.add(objectManager)
         }
       } else {
         for (const item of apartmentRenderSet) {
