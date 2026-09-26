@@ -3,11 +3,10 @@ import { ArrowLeft, ArrowRight, Building2, Calculator, Camera, ChevronDown, Home
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
-import { buildDistrictStats, type DistrictStats } from '../lib/districtStats'
+import type { DistrictStats } from '../lib/districtStats'
 import { calculateMortgage } from '../components/MortgageCalculator'
 import { PageLoading, EmptyState } from '../components/Ui'
 import { useGeoDomStore } from '../store/useGeoDomStore'
-import type { Apartment } from '../types'
 
 type SortMode='score'|'price'|'price_m2'|'count'
 
@@ -16,7 +15,7 @@ function formatNumber(value:number|null,suffix='') {
 }
 
 export function Districts() {
-  const [items,setItems]=useState<Apartment[]>([])
+  const [stats,setStats]=useState<DistrictStats[]>([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [sort,setSort]=useState<SortMode>('score')
@@ -25,10 +24,8 @@ export function Districts() {
   const preferences=useGeoDomStore(state => state.preferences)
 
   useEffect(() => {
-    api.list().then(setItems).catch(error => setError(error instanceof Error ? error.message : 'Не удалось загрузить квартиры')).finally(() => setLoading(false))
+    api.districtStats().then(setStats).catch(error => setError(error instanceof Error ? error.message : 'Не удалось загрузить статистику районов')).finally(() => setLoading(false))
   },[])
-
-  const stats=useMemo(() => buildDistrictStats(items),[items])
   const sorted=useMemo(() => [...stats].sort((a,b) => {
     if (sort === 'count') return b.count-a.count
     if (sort === 'price') return (a.medianPrice ?? Infinity)-(b.medianPrice ?? Infinity)
