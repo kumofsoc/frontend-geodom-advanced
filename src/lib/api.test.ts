@@ -27,10 +27,9 @@ describe('demo listing lifecycle', () => {
 
   it('registers when crypto.randomUUID is unavailable', async () => {
     const original = globalThis.crypto
-    const getRandomValues = original?.getRandomValues?.bind(original)
     Object.defineProperty(globalThis,'crypto',{
       configurable:true,
-      value:getRandomValues ? { getRandomValues } : undefined
+      value:{ getRandomValues:original.getRandomValues.bind(original) }
     })
     try {
       const user = await api.register('compat_user','password123')
