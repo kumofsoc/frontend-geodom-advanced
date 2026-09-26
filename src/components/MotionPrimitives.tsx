@@ -64,3 +64,15 @@ export function StaggerItem({
     {children}
   </motion.div>
 }
+
+
+export function PageTransition({ children }:{ children:ReactNode }) {
+  const reduceMotion = useReducedMotion()
+  return <motion.div
+    initial={reduceMotion ? false : { opacity:0,y:8 }}
+    animate={{ opacity:1,y:0 }}
+    transition={{ duration:.34,ease:[.22,1,.36,1] }}
+  >
+    {children}
+  </motion.div>
+}
