@@ -5,7 +5,7 @@ import { normalizeGeoObjects, type GeoObject } from './dataSanitizers'
 import { buildDistrictStats, type DistrictStats } from './districtStats'
 import { createId, demoPasswordDigest, matchesDemoPassword } from './id'
 import { withLocalHousingMedia } from './media'
-import type { Apartment, DistrictMarketStats, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
+import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 export const isDemo = !base
@@ -62,10 +62,6 @@ export const api = {
       return demoHomes().filter(x => x.status === 'published').map(withLocalHousingMedia)
     }
     return (await request<Apartment[]>('/api/apartments')).map(withLocalHousingMedia)
-  },
-  async districtStats(): Promise<DistrictMarketStats[]> {
-    if (isDemo) return []
-    return request<DistrictMarketStats[]>('/api/district-stats')
   },
   async geoObjects(): Promise<GeoObject[]> { if (isDemo) { await delay(); return normalizeGeoObjects(demoGeoRows) } return normalizeGeoObjects(await request<unknown>('/api/geo-objects')) },
   async districtStats(): Promise<DistrictStats[]> {
