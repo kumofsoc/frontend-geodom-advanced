@@ -58,7 +58,7 @@ export function normalizeRecommendation(raw: {
       price:numberOr(item.price,0),
       price_m2:numberOr(item.price_m2,0),
       predicted_price_m2:nullableNumber(item.predicted_price_m2),
-      score:numberOr(item.score,0),
+      score:nullableNumber(item.score),
       scores:Object.fromEntries(keys.map(key => [key,nullableNumber(item.scores?.[key])])) as RecommendationItem['scores'],
       contributions:item.contributions
         ? Object.fromEntries(keys.flatMap(key => {
@@ -113,7 +113,7 @@ export function demoRecommend(input: RecommendationRequest): RecommendationRespo
       warnings:[],
       cover_image_url:home.photos[0]?.url || null
     }
-  }).sort((a,b) => b.score-a.score)
+  }).sort((a,b) => (b.score ?? -Infinity)-(a.score ?? -Infinity)
   return {
     request_id:createId(),
     model_version:'demo-no-model',
