@@ -1,7 +1,7 @@
 import { useEffect,useMemo,useState } from 'react'
 import { BadgeCheck, BarChart3, Building2, Check, Crown, LockKeyhole, Megaphone, Phone, Target, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api,isDemo } from '../lib/api'
 import { price } from '../lib/catalog'
 import { DEMO_PRO_LEADS,leadAnalytics,loadLeadPipeline,loadPromotedIds,matchLeadToApartment,savePromotedIds,setLeadStage,type LeadStage,type ProLead } from '../lib/pro'
 import { loadSharedDemandProfile,sharedDemandProfileToLead } from '../lib/demandProfile'
@@ -20,10 +20,16 @@ export function Pro() {
   const [unlocked,setUnlocked]=useState<string[]>([])
   const [pipeline,setPipeline]=useState<Record<string,LeadStage>>(loadLeadPipeline)
   const [stageFilter,setStageFilter]=useState<'all'|LeadStage>('all')
+  const [proStatus,setProStatus]=useState<'loading'|'none'|'trial'|'active'|'expired'|'disabled'>(isDemo ? 'active' : 'loading')
+  const [liveMatches,setLiveMatches]=useState<Array<{lead:ProLead;score:number;reasons:string[];stage:LeadStage}>>([])
+  const [proBusy,setProBusy]=useState(false)
   const sharedProfile=useMemo(() => loadSharedDemandProfile(),[])
-  const crmLeads=useMemo(() => sharedProfile?.consentToContact
-    ? [sharedDemandProfileToLead(sharedProfile),...DEMO_PRO_LEADS]
-    : DEMO_PRO_LEADS,[sharedProfile])
+  const crmLeads=useMemo(() => {
+    if (!isDemo) return []
+    return sharedProfile?.consentToContact
+      ? [sharedDemandProfileToLead(sharedProfile),...DEMO_PRO_LEADS]
+      : DEMO_PRO_LEADS
+  },[sharedProfile])
 
   useEffect(() => {
     api.mine()
