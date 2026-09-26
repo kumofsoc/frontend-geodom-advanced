@@ -19,6 +19,7 @@ function encodedPath(value:string) {
 }
 
 const base=(import.meta.env.VITE_LOCAL_MEDIA_BASE_URL || '/media').replace(/\/$/,'')
+const allowUnverifiedLocalMedia=import.meta.env.DEV && import.meta.env.VITE_ALLOW_UNVERIFIED_LOCAL_MEDIA !== 'false'
 
 export function localMediaUrl(value:string|null|undefined) {
   if (!value) return null
@@ -30,6 +31,24 @@ export function resolvePhotoUrl(photo:Partial<ApartmentPhoto>) {
   const url=typeof photo.url === 'string' ? photo.url.trim() : ''
   if (url) return url
   return localMediaUrl(photo.local_path || photo.storage_key)
+}
+
+function allowed(photo:{ publication_allowed?:boolean }) {
+  return photo.publication_allowed !== false || allowUnverifiedLocalMedia
+}
+
+export function localPhotosForApartmentId(id:string|number) {
+  const photos=localHousingMedia[String(id)] || []
+  return [...photos]
+    .filter(allowed)
+    .sort((a,b) => a.order-b.order)
+    .map(photo => ({ ...photo,url:resolvePhotoUrl(photo) || '' }))
+    .filter(photo => !!photo.url)
+}
+
+export function localCoverForApartmentId(id:string|number) {
+  const photos=localPhotosForApartmentId(id)
+  return photos.find(photo => photo.is_cover)?.url || photos[0]?.url || null
 }
 
 export function withLocalHousingMedia(apartment:Apartment):Apartment {
@@ -44,17 +63,12 @@ export function withLocalHousingMedia(apartment:Apartment):Apartment {
   ].filter((value):value is string => !!value)
 
   for (const key of candidates) {
-    const photos=localHousingMedia[key]
-    if (!photos?.length) continue
-    return {
-      ...apartment,
-      photos:[...photos]
-        .sort((a,b) => a.order-b.order)
-        .map(photo => ({ ...photo,url:resolvePhotoUrl(photo) || '' }))
-    }
+    const photos=localPhotosForApartmentId(key)
+    if (!photos.length) continue
+    return { ...apartment,photos }
   }
 
-  if (apartment.cover_storage_key) {
+  if (apartment.cover_storage_key && allowUnverifiedLocalMedia) {
     const url=localMediaUrl(apartment.cover_storage_key)
     if (url) {
       return {
