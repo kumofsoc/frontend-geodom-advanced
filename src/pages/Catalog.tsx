@@ -17,12 +17,15 @@ import {
   validatePreferences
 } from '../lib/preferences'
 import { loadLastRecommendation } from '../lib/recommendations'
+import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
 
 export function Catalog() {
   const [items,setItems] = useState<Apartment[]>([])
   const [loading,setLoading] = useState(true)
   const [error,setError] = useState('')
+  const [geoObjects,setGeoObjects] = useState<GeoObject[]>([])
+  const [geoError,setGeoError] = useState('')
   const [params,setParams] = useSearchParams()
   const [filtersOpen,setFiltersOpen] = useState(false)
   const [workPicking,setWorkPicking] = useState(false)
@@ -42,6 +45,7 @@ export function Catalog() {
 
   useEffect(() => {
     api.list().then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false))
+    api.geoObjects().then(setGeoObjects).catch(e => setGeoError(e instanceof Error ? e.message : 'Не удалось загрузить инфраструктуру'))
   },[])
 
   useEffect(() => {
@@ -192,6 +196,7 @@ export function Catalog() {
               ? <EmptyState title="Карта недоступна" message={error}/>
               : <MapPanel
                   items={items}
+                  geoObjects={geoObjects}
                   activeApartmentIds={visibleIds}
                   selectedDistrict={filters.district}
                   onDistrict={pickDistrict}
@@ -199,7 +204,7 @@ export function Catalog() {
                   workPicking={workPicking}
                   onWorkLocation={chooseWorkLocation}
                 />}
-          <div className="map-caption"><CircleHelp size={15}/> Районы превращаются в точки при приближении. Колесо мыши масштабирует карту. <span>Картография © Яндекс</span></div>
+          <div className="map-caption"><CircleHelp size={15}/> Районы превращаются в точки при приближении. Инфраструктура кластеризуется и фильтруется слоями.{geoError ? ` Слой POI недоступен: ${geoError}.` : ''} <span>Картография © Яндекс</span></div>
         </div>
 
         <RecommendationResults response={response} loading={recommendationLoading} error={recommendationError} onRetry={() => { void recommend(preferences) }}/>
