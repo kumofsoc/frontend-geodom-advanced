@@ -3,6 +3,7 @@ import { demoGeoRows } from '../data/demoGeoObjects'
 import { demoRecommend, logDemoEvent, normalizeRecommendation, rememberRecommendation } from './recommendations'
 import { normalizeGeoObjects, type GeoObject } from './dataSanitizers'
 import { createId, demoPasswordDigest, matchesDemoPassword } from './id'
+import { withLocalHousingMedia } from './media'
 import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
@@ -50,9 +51,23 @@ export const api = {
     if (isDemo) { logDemoEvent(payload); return }
     await request<void>('/api/v1/events', { method:'POST', body:JSON.stringify(payload) })
   },
-  async list(): Promise<Apartment[]> { if (isDemo) { await delay(); return demoHomes().filter(x => x.status === 'published') } return request<Apartment[]>('/api/apartments') },
+  async list(): Promise<Apartment[]> {
+    if (isDemo) {
+      await delay()
+      return demoHomes().filter(x => x.status === 'published').map(withLocalHousingMedia)
+    }
+    return (await request<Apartment[]>('/api/apartments')).map(withLocalHousingMedia)
+  },
   async geoObjects(): Promise<GeoObject[]> { if (isDemo) { await delay(); return normalizeGeoObjects(demoGeoRows) } return normalizeGeoObjects(await request<unknown>('/api/geo-objects')) },
-  async detail(id: string): Promise<Apartment> { if (isDemo) { await delay(); const item = demoHomes().find(x => x.id === id && x.status !== 'deleted'); if (!item) throw new Error('Объявление не найдено'); return item } return request<Apartment>(`/api/apartments/${encodeURIComponent(id)}`) },
+  async detail(id: string): Promise<Apartment> {
+    if (isDemo) {
+      await delay()
+      const item=demoHomes().find(x => x.id === id && x.status !== 'deleted')
+      if (!item) throw new Error('Объявление не найдено')
+      return withLocalHousingMedia(item)
+    }
+    return withLocalHousingMedia(await request<Apartment>(`/api/apartments/${encodeURIComponent(id)}`))
+  },
   async mine(): Promise<Apartment[]> { if (isDemo) { await delay(); return demoHomes().filter(x => x.owner_id === getSession()?.user.id && x.status !== 'deleted') } return request<Apartment[]>('/api/users/me/apartments') },
   async register(login: string, password: string): Promise<User> {
     if (!isDemo) return request<User>('/api/auth/register', { method: 'POST', body: JSON.stringify({ login, password }) })

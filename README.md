@@ -64,6 +64,7 @@ npm run build
 - `src/pages/Catalog.tsx` — аналитический главный экран, карта, фильтры, квартиры.
 - `src/pages/Detail.tsx` — готовый DTO квартиры, инфраструктура, будущие объекты, оценка и сохранение.
 - `src/pages/Report.tsx` — клиентский printable/PDF-отчёт по последней успешной подборке.
+- `src/pages/Compare.tsx` — отдельный comparison workspace; сравнение больше не висит поверх карты/каталога.
 - `src/components/PreferencePanel.tsx`, `RecommendationResults.tsx`, `ScorePanel.tsx` — параметры, персональная выдача, предупреждения и сравнение.
 - `src/pages/Auth.tsx`, `Account.tsx`, `ListingForm.tsx` — пользовательский сценарий.
 - `src/components/MapPanel.tsx` — Yandex Maps, квартиры/районы, zoom-aware маркеры и выбор места работы; геопризнаки на клиенте не считает.
@@ -110,3 +111,27 @@ npm run build
 Карта использует LOD-политику: при сильном отдалении квартиры не рендерятся вообще, затем появляются кластеры, и только на близком масштабе — price-pins. На близком масштабе рендер ограничен текущим viewport; если price-pins становятся слишком многочисленными, интерфейс автоматически возвращается к кластерам. POI также скрываются на дальнем масштабе и ограничиваются viewport/cap, чтобы карта не деградировала при больших наборах данных.
 
 Подробный performance-план для React, карты, Framer Motion и Three.js: `docs/frontend-performance-roadmap.md`.
+
+
+## Временный локальный media bridge
+
+Go backend уже моделирует импортированные фото через media metadata и позже должен отдавать frontend реальные URL. Пока сами файлы ещё не подключены через backend, frontend умеет использовать локальную копию архива **только как временный dev-fallback**.
+
+Подготовка:
+
+```bash
+mkdir -p public/media local-data
+
+# Скопировать содержимое media/ из housing-архива в public/media/
+# Скопировать processed/housing/media.jsonl:
+cp /path/to/archive/processed/housing/media.jsonl local-data/media.jsonl
+
+npm run media:manifest
+npm run dev
+```
+
+Генератор создаёт `src/data/localHousingMedia.generated.ts` и связывает `entity_id` с фотографиями по `position`. Backend URL в `photos[].url` **всегда имеет приоритет**. Локальный `storage_key/local_path` используется только когда URL отсутствует.
+
+В production unverified media с `publication_allowed=false` локальным fallback не показывается. Для закрытого dev-demo оно доступно через `VITE_ALLOW_UNVERIFIED_LOCAL_MEDIA=true`.
+
+После готовности выдачи фото из Go API этот bridge удаляется без изменения UI-компонентов: компоненты уже работают через общий `resolvePhotoUrl()`.

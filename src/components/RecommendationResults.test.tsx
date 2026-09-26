@@ -22,6 +22,6 @@ it('shows warnings and records an impression, save and compare with request cont
   fireEvent.click(screen.getByRole('button',{name:'Сохранить квартиру'}))
   fireEvent.click(screen.getByRole('button',{name:'Добавить к сравнению'}))
   expect(getSavedIds()).toEqual(['a1'])
-  expect(screen.getByRole('region',{name:'Сравнение квартир'})).toBeTruthy()
+  expect(screen.getByRole('link',{name:/Открыть сравнение/})).toBeTruthy()
   await waitFor(() => expect(readDemoEvents().map(e => e.event)).toEqual(['impression','save','compare']))
 })

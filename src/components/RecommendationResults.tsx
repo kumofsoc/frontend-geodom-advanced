@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, FileText, GitCompareArrows, Sparkles, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowUpRight, Bookmark, Check, CircleAlert, FileText, GitCompareArrows, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useGeoDomStore } from '../store/useGeoDomStore'
 import { price } from '../lib/catalog'
+import { localCoverForApartmentId } from '../lib/media'
 import type { InteractionEvent, RecommendationItem, RecommendationResponse } from '../types'
 
 const dimensions: Array<{ key:keyof RecommendationItem['scores']; label:string }> = [
@@ -30,13 +31,7 @@ export function RecommendationResults({ response, loading, error, onRetry }:{ re
   const compared = useGeoDomStore(state => state.comparedIds)
   const toggleSaved = useGeoDomStore(state => state.toggleSaved)
   const toggleCompared = useGeoDomStore(state => state.toggleCompared)
-  const pruneCompared = useGeoDomStore(state => state.pruneCompared)
-  const clearCompared = useGeoDomStore(state => state.clearCompared)
   const sent = useRef(new Set<string>())
-  useEffect(() => {
-    if (!response) return
-    pruneCompared(response.items.map(item => String(item.apartment_id)))
-  },[response?.request_id,pruneCompared])
   function track(event:InteractionEvent,item:RecommendationItem,position:number) {
     if (!response) return
     const key = `${response.request_id}:${event}:${item.apartment_id}`
@@ -55,8 +50,10 @@ export function RecommendationResults({ response, loading, error, onRetry }:{ re
     {loading ? <div className="recommendation-loading"><span className="spinner"/> Подбираем варианты под ваши параметры…</div> : error ? <div className="recommendation-error"><CircleAlert size={20}/><div><b>Не удалось получить рекомендации</b><p>{error}. Общий каталог ниже доступен.</p></div><button onClick={onRetry}>Повторить</button></div> : response && <>
       {response.warnings.length > 0 && <div className="recommendation-warning"><CircleAlert size={19}/><div>{response.warnings.map(w => <p key={w}>{w}</p>)}</div></div>}
       {response.items.length ? <div className="recommendation-grid">{response.items.map((item,index) => <RecommendationCard key={String(item.apartment_id)} item={item} position={index+1} saved={saved.includes(String(item.apartment_id))} compared={compared.includes(String(item.apartment_id))} compareFull={compared.length >= 3} onImpression={() => track('impression',item,index+1)} onOpen={() => track('click',item,index+1)} onSave={() => save(item,index+1)} onCompare={() => compare(item,index+1)}/>)}</div> : <div className="recommendation-empty"><h3>В этом бюджете вариантов нет</h3><p>Увеличьте максимальную стоимость или посмотрите общий каталог ниже.</p></div>}
-      <div className="recommendation-meta"><Sparkles size={15}/> {response.ml_available ? `Модель: ${response.model_version}` : 'Демонстрационный скоринг без ML'} · Запрос {response.request_id.slice(0,8)}</div>
-      <AnimatePresence>{compared.length > 0 && <CompareTray items={compared.map(id => response.items.find(item => String(item.apartment_id) === id)).filter((item):item is RecommendationItem => !!item)} onOpen={item => track('click',item,response.items.findIndex(candidate => candidate.apartment_id === item.apartment_id)+1)} onRemove={id => toggleCompared(id)} onClose={clearCompared}/>}</AnimatePresence>
+      <div className="recommendation-meta-row">
+        <div className="recommendation-meta"><Sparkles size={15}/> {response.ml_available ? `Модель: ${response.model_version}` : 'Демонстрационный скоринг без ML'} · Запрос {response.request_id.slice(0,8)}</div>
+        {compared.length > 0 && <Link className="compare-page-cta" to="/compare"><GitCompareArrows size={15}/> Открыть сравнение <b>{compared.length}</b></Link>}
+      </div>
     </>}
   </section>
 }
@@ -70,13 +67,6 @@ function RecommendationCard({item,position,saved,compared,compareFull,onImpressi
   },[onImpression])
   const contributions = scoreContributions(item)
   const reduceMotion = useReducedMotion()
-  return <motion.article ref={ref} className="recommendation-card" layout={!reduceMotion} transition={{ layout:{ duration:.34,ease:[.22,1,.36,1] } }}><Link to={`/apartments/${item.apartment_id}`} onClick={onOpen} className="recommendation-cover">{item.cover_image_url ? <img src={item.cover_image_url} alt={item.title} loading="lazy"/> : <div className="image-placeholder">GEODOM</div>}<span className="recommendation-rank">#{position} В ПОДБОРКЕ</span></Link><div className="recommendation-body"><div className="recommendation-score-row"><span className="recommendation-score"><Sparkles size={15}/> {item.score.toFixed(1)} <small>/ 10</small></span><span className="score-caption">СООТВЕТСТВИЕ</span></div><Link to={`/apartments/${item.apartment_id}`} onClick={onOpen} className="recommendation-title">{item.title} <ArrowUpRight size={17}/></Link><div className="recommendation-price">{price(item.price)} <small>{price(item.price_m2)} / м²</small></div><ul className="reason-list">{item.reasons.slice(0,2).map(reason => <li key={reason}><Check size={14}/>{reason}</li>)}</ul><div className="mini-scores">{dimensions.slice(0,3).map(({key,label}) => <div key={key}><span>{label}</span><div><i style={{width:`${(item.scores[key] || 0)*10}%`}}/></div><b>{item.scores[key]?.toFixed(1) ?? '—'}</b></div>)}</div>{contributions.length > 0 && <details className="score-explanation"><summary>Почему такой score?</summary><div>{contributions.slice(0,5).map(([key,value]) => <span key={key}><b>{contributionLabels[key]}</b><em>+{value.toFixed(1)}</em></span>)}</div><small>Вклады складываются в итоговую оценку для текущих весов.</small></details>}{item.warnings.length > 0 && <div className="card-warning">{item.warnings.join(' · ')}</div>}<div className="recommendation-actions"><button onClick={onSave} className={saved ? 'active' : ''} aria-label={saved ? 'Убрать из сохранённого' : 'Сохранить квартиру'}><Bookmark size={16} fill={saved?'currentColor':'none'}/>{saved?'Сохранено':'Сохранить'}</button><button onClick={onCompare} className={compared?'active':''} disabled={compareFull&&!compared} aria-label={compared?'Убрать из сравнения':'Добавить к сравнению'}><GitCompareArrows size={16}/>{compared?'В сравнении':'Сравнить'}</button></div></div></motion.article>
-}
-function CompareTray({items,onOpen,onRemove,onClose}:{items:RecommendationItem[];onOpen:(item:RecommendationItem)=>void;onRemove:(id:string)=>void;onClose:()=>void}) {
-  const reduceMotion = useReducedMotion()
-  return <motion.div className="compare-tray" role="region" aria-label="Сравнение квартир"
-    initial={reduceMotion ? false : { opacity:0,y:22,scale:.985 }}
-    animate={{ opacity:1,y:0,scale:1 }}
-    exit={reduceMotion ? { opacity:0 } : { opacity:0,y:14,scale:.99 }}
-    transition={{ duration:.28,ease:[.22,1,.36,1] }}><div className="compare-tray-head"><div><b>Сравнение квартир</b><span>До трёх вариантов рядом</span></div><button onClick={onClose} aria-label="Закрыть сравнение"><X size={18}/></button></div><div className="compare-columns">{items.map(item => <div key={String(item.apartment_id)}><button className="compare-remove" onClick={() => onRemove(String(item.apartment_id))} aria-label={`Убрать ${item.title}`}><X size={13}/></button><Link to={`/apartments/${item.apartment_id}`} onClick={() => onOpen(item)}>{item.title} <ArrowRight size={13}/></Link><strong>{price(item.price)}</strong><span>Оценка {item.score.toFixed(1)} / 10</span><span>Школы {item.scores.schools?.toFixed(1) ?? '—'} · Парки {item.scores.parks?.toFixed(1) ?? '—'}</span><span>Транспорт {item.scores.transport?.toFixed(1) ?? '—'}</span></div>)}</div></motion.div>
+  const cover = item.cover_image_url || localCoverForApartmentId(item.apartment_id)
+  return <motion.article ref={ref} className="recommendation-card" layout={!reduceMotion} transition={{ layout:{ duration:.34,ease:[.22,1,.36,1] } }}><Link to={`/apartments/${item.apartment_id}`} onClick={onOpen} className="recommendation-cover">{cover ? <img src={cover} alt={item.title} loading="lazy"/> : <div className="image-placeholder">GEODOM</div>}<span className="recommendation-rank">#{position} В ПОДБОРКЕ</span></Link><div className="recommendation-body"><div className="recommendation-score-row"><span className="recommendation-score"><Sparkles size={15}/> {item.score.toFixed(1)} <small>/ 10</small></span><span className="score-caption">СООТВЕТСТВИЕ</span></div><Link to={`/apartments/${item.apartment_id}`} onClick={onOpen} className="recommendation-title">{item.title} <ArrowUpRight size={17}/></Link><div className="recommendation-price">{price(item.price)} <small>{price(item.price_m2)} / м²</small></div><ul className="reason-list">{item.reasons.slice(0,2).map(reason => <li key={reason}><Check size={14}/>{reason}</li>)}</ul><div className="mini-scores">{dimensions.slice(0,3).map(({key,label}) => <div key={key}><span>{label}</span><div><i style={{width:`${(item.scores[key] || 0)*10}%`}}/></div><b>{item.scores[key]?.toFixed(1) ?? '—'}</b></div>)}</div>{contributions.length > 0 && <details className="score-explanation"><summary>Почему такой score?</summary><div>{contributions.slice(0,5).map(([key,value]) => <span key={key}><b>{contributionLabels[key]}</b><em>+{value.toFixed(1)}</em></span>)}</div><small>Вклады складываются в итоговую оценку для текущих весов.</small></details>}{item.warnings.length > 0 && <div className="card-warning">{item.warnings.join(' · ')}</div>}<div className="recommendation-actions"><button onClick={onSave} className={saved ? 'active' : ''} aria-label={saved ? 'Убрать из сохранённого' : 'Сохранить квартиру'}><Bookmark size={16} fill={saved?'currentColor':'none'}/>{saved?'Сохранено':'Сохранить'}</button><button onClick={onCompare} className={compared?'active':''} disabled={compareFull&&!compared} aria-label={compared?'Убрать из сравнения':'Добавить к сравнению'}><GitCompareArrows size={16}/>{compared?'В сравнении':'Сравнить'}</button></div></div></motion.article>
 }
