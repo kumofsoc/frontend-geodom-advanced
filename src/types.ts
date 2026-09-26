@@ -184,3 +184,19 @@ export interface RentVsBuyBackendResponse {
   updated_at:string|null
   warnings:string[]
 }
+
+
+export interface FutureDevelopmentMapItem {
+  id:string
+  name:string
+  type:string
+  description:string
+  latitude:number
+  longitude:number
+  address:string|null
+  status:'planned'|'approved'|'construction'|'completed'|'cancelled'
+  plannedCompletionYear:number|null
+  sourceUrl:string|null
+  sourceName:string
+  updatedAt:string|null
+}
