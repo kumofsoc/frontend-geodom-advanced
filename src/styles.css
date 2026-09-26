@@ -54,3 +54,15 @@
 .map-layer-panel+.map-legend{top:auto;bottom:14px}
 @media(max-width:760px){.map-layer-panel{width:190px;right:8px;top:8px;padding:8px}.map-layer-panel>button{padding:6px 4px}.map-layer-panel>button span{font-size:8px}}
 @media(max-width:520px){.map-layer-panel{width:174px}.map-layer-title small{display:none}.map-layer-panel>button{grid-template-columns:10px 1fr auto;gap:5px}.map-layer-panel>button span{font-size:7.5px}.map-layer-panel+.map-legend{display:none}}
+
+
+/* Explainable life-fit score */
+.score-explanation{margin-top:10px;border-top:1px solid #e8eef5;padding-top:9px}
+.score-explanation summary{cursor:pointer;list-style:none;color:#2278d8;font-size:9px;font-weight:800}
+.score-explanation summary::-webkit-details-marker{display:none}
+.score-explanation summary:after{content:'+';float:right;color:#7d94aa;font-size:13px;line-height:9px}
+.score-explanation[open] summary:after{content:'−'}
+.score-explanation>div{display:grid;gap:5px;margin-top:9px}
+.score-explanation>div span{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8.5px;color:#627b94}
+.score-explanation>div b{font-weight:700}.score-explanation>div em{font-style:normal;color:#0d9a64;font-weight:800}
+.score-explanation>small{display:block;margin-top:7px;font-size:7.5px;line-height:1.45;color:#9aabba}
