@@ -1159,3 +1159,42 @@ img,svg,canvas{max-width:100%}
   min-width:0;
   overflow-wrap:anywhere;
 }
+
+
+/* Mortgage draft persistence + account history */
+.mortgage-wizard-head-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.mortgage-wizard-head-actions>button{min-height:32px;border:1px solid #dce5eb;border-radius:8px;background:#fff;color:#5d7385;padding:0 9px;font-size:7px;font-weight:900}
+.mortgage-wizard-head-actions>button:hover{background:#f5f8fa}
+
+.saved-mortgages-panel{margin:18px 0 24px;padding:17px;border:1px solid #dce7f0;border-radius:12px;background:#fff}
+.saved-mortgages-head{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:start}
+.saved-mortgages-head>span{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:#edf8f3;color:#13865e}
+.saved-mortgages-head small{display:block;font-size:7px;font-weight:800;letter-spacing:.9px;color:#4a8a70}
+.saved-mortgages-head h2{margin:3px 0 4px;font-size:15px;color:#213f5d}
+.saved-mortgages-head p{margin:0;color:#7c90a3;font-size:8px;line-height:1.5}
+.saved-mortgages-head>b{padding:7px 9px;border-radius:999px;background:#edf7f3;color:#0b9463;font-size:8px}
+.saved-mortgage-list{display:grid;gap:8px;margin-top:13px}
+.saved-mortgage-list article{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,.45fr) 32px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #e3ebf2;border-radius:9px;background:#fbfcfe}
+.saved-mortgage-main,.saved-mortgage-payment{min-width:0}
+.saved-mortgage-main>span{display:block;font-size:6.8px;font-weight:900;letter-spacing:.7px;color:#14855d;text-transform:uppercase}
+.saved-mortgage-main h3{margin:3px 0;color:#294864;font-size:11px}
+.saved-mortgage-main p{margin:0;color:#71869a;font-size:8px;line-height:1.4}
+.saved-mortgage-payment{text-align:right}
+.saved-mortgage-payment span,.saved-mortgage-payment b,.saved-mortgage-payment small{display:block}
+.saved-mortgage-payment span{color:#8a9cab;font-size:6.5px}
+.saved-mortgage-payment b{margin-top:3px;color:#183f31;font-size:10px}
+.saved-mortgage-payment small{margin-top:3px;color:#92a1ad;font-size:6.5px}
+.saved-mortgage-list article>button{display:grid;place-items:center;width:32px;height:32px;border:1px solid #eadede;border-radius:7px;background:#fffafa;color:#a45e5e}
+.saved-mortgage-empty{margin-top:12px;padding:13px;border-radius:8px;background:#f7fafc;color:#7e91a4;font-size:8px;line-height:1.5}
+@media(max-width:640px){
+  .mortgage-wizard-head-actions{width:100%;justify-content:flex-start}
+  .mortgage-wizard-head-actions>button{min-height:40px;font-size:9px}
+  .saved-mortgages-panel{padding:13px}
+  .saved-mortgages-head{grid-template-columns:38px minmax(0,1fr)}
+  .saved-mortgages-head>b{grid-column:2;justify-self:start}
+  .saved-mortgages-head h2{font-size:16px}.saved-mortgages-head p{font-size:10px}
+  .saved-mortgage-list article{grid-template-columns:minmax(0,1fr) 36px}
+  .saved-mortgage-payment{grid-column:1;text-align:left}
+  .saved-mortgage-list article>button{grid-column:2;grid-row:1/3;width:36px;height:36px}
+  .saved-mortgage-main h3{font-size:12px}.saved-mortgage-main p{font-size:9px}.saved-mortgage-payment b{font-size:11px}.saved-mortgage-payment small{font-size:8px}
+}
