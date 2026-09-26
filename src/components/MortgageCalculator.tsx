@@ -4,6 +4,7 @@ import { price as formatPrice } from '../lib/catalog'
 import { KRASNOYARSK_MORTGAGE_BANKS,KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE,mortgageOfferEligibility,type MortgageBankOffer } from '../lib/mortgageBanks'
 import { mortgageProgramEligibility,resolveMortgageProgram,type MortgageProgramTerms } from '../lib/mortgagePrograms'
 import { clearMortgageWizardDraft,loadMortgageWizardDraft,saveMortgageCalculation,saveMortgageWizardDraft } from '../lib/mortgageStorage'
+import { DataFreshness,SourceBadge,WarningBanner } from './DataTrust'
 
 export type MortgageCalculation={ principal:number; monthlyPayment:number; totalPayment:number; overpayment:number }
 export type MortgageWizardScenario='newbuild'|'secondary'|'family'|'it'
@@ -416,6 +417,15 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
 
         {paymentLoad !== null && <div className="mortgage-final-load"><UserRound size={15}/><span>Платежи после ипотеки составят примерно <b>{paymentLoad.toFixed(0)}%</b> указанного месячного дохода. Это только ориентир, а не банковская оценка платёжеспособности.</span></div>}
         {!selected.eligible && <div className="mortgage-final-warning">{selected.reasons[0] || 'Текущие параметры нужно уточнить у банка.'}</div>}
+        <div className="mortgage-final-source">
+          <SourceBadge name={selected.offer.sourceLabel} url={selected.offer.sourceUrl}/>
+          <DataFreshness date={selected.offer.updatedAt} label="Условия проверены"/>
+        </div>
+        <WarningBanner title="Важно" warnings={[
+          'Расчёт предварительный и не является одобрением банка.',
+          ...(selected.programRate ? ['Ставка льготной программы не гарантирует участие конкретного банка или соответствие заёмщика всем условиям.'] : []),
+          ...(selected.estimated ? ['Для новостройки используется ориентир текущего банковского snapshot, а не отдельный live-feed новостроек.'] : [])
+        ]}/>
       </div>
 
       <div className="mortgage-other-head">
@@ -433,10 +443,10 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
       </div>
 
       <div className="mortgage-final-actions">
-        <a className="mortgage-apply-button" href={selected.offer.sourceUrl} target="_blank" rel="noopener noreferrer">Подать заявку <ArrowRight size={18}/></a>
+        <a className="mortgage-apply-button" href={selected.offer.sourceUrl} target="_blank" rel="noopener noreferrer">Перейти к условиям <ArrowRight size={18}/></a>
         <button type="button" className={saved ? 'saved' : ''} onClick={saveCalculation}><Save size={17}/>{saved ? 'Расчёт сохранён' : 'Сохранить расчёт'}</button>
       </div>
-      <p className="mortgage-final-footnote">Сейчас «Подать заявку» открывает источник выбранного предложения. Партнёрская отправка заявки появится после backend-интеграции.</p>
+      <p className="mortgage-final-footnote">GeoDom открывает первоисточник выбранного предложения и не отправляет банковскую заявку. Условия и доступность программы подтвердите у банка.</p>
 
       <div className="mortgage-wizard-actions start">
         <button type="button" className="mortgage-wizard-secondary" onClick={() => setStep(3)}><ArrowLeft size={16}/> Изменить параметры</button>
