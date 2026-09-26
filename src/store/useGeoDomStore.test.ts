@@ -62,3 +62,12 @@ it('prunes comparison ids that no longer exist in the active recommendation set'
 
   expect(useGeoDomStore.getState().comparedIds).toEqual(['a1','a2'])
 })
+
+
+it('restores a complete saved filter snapshot',() => {
+  const snapshot={...defaultCatalogFilters,district:'Октябрьский',rooms:3,minArea:70,onlyWithPhotos:true}
+  useGeoDomStore.getState().replaceFilters(snapshot)
+
+  expect(useGeoDomStore.getState().filters).toEqual(snapshot)
+  expect(JSON.parse(localStorage.getItem('geodom-catalog-filters-v1') || '{}')).toEqual(snapshot)
+})
