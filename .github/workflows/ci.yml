@@ -19,6 +19,12 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run size:check
+      - name: Validate production Compose
+        shell: bash
+        env:
+          VITE_API_URL: https://api.example.test
+          VITE_YANDEX_MAPS_API_KEY: ci-browser-key
+        run: docker compose -f docker-compose.prod.yml config >/dev/null
       - run: docker build -t geodom-frontend:ci .
       - name: Smoke test production container
         shell: bash
