@@ -10,7 +10,18 @@ import { withLocalHousingMedia } from './media'
 import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const configuredTimeout=Number(import.meta.env.VITE_API_REQUEST_TIMEOUT_MS || 15000)
+const requestTimeoutMs=Number.isFinite(configuredTimeout) && configuredTimeout >= 1000 ? configuredTimeout : 15000
 export const isDemo = !base
+
+export class ApiError extends Error {
+  status:number|null
+  constructor(message:string,status:number|null=null) {
+    super(message)
+    this.name='ApiError'
+    this.status=status
+  }
+}
 const homesKey = 'geodom-demo-apartments-v1'
 const usersKey = 'geodom-demo-users-v1'
 const sessionKey = 'geodom-session-v1'
@@ -71,17 +82,46 @@ function getSession(): { user: User; token: string } | null { try { return JSON.
 const storeSession = (session: { user: User; token: string } | null) => session ? sessionStorage.setItem(sessionKey, JSON.stringify(session)) : sessionStorage.removeItem(sessionKey)
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const session = getSession()
-  let response: Response
-  try { response = await fetch(`${base}${path}`, { ...options, headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}), ...options.headers } }) }
-  catch { throw new Error('Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.') }
-  if (!response.ok) {
-    let message = 'Не удалось выполнить действие'
-    try { const body = await response.json(); message = typeof body.detail === 'string' ? body.detail : body.message || message } catch { /* no JSON error */ }
-    throw new Error(message)
+  const controller=new AbortController()
+  const timeout=globalThis.setTimeout(() => controller.abort(),requestTimeoutMs)
+  let response:Response
+
+  try {
+    response=await fetch(`${base}${path}`,{
+      ...options,
+      signal:options.signal ?? controller.signal,
+      headers:{
+        ...(options.body instanceof FormData ? {} : {'Content-Type':'application/json'}),
+        ...(session?.token ? {Authorization:`Bearer ${session.token}`} : {}),
+        ...options.headers
+      }
+    })
+  } catch(error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError('Сервер отвечает слишком долго. Попробуйте ещё раз.',null)
+    }
+    throw new ApiError('Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.',null)
+  } finally {
+    globalThis.clearTimeout(timeout)
   }
+
+  if (!response.ok) {
+    let message='Не удалось выполнить действие'
+    try {
+      const body=await response.json()
+      message=typeof body.detail === 'string' ? body.detail : body.message || message
+    } catch { /* no JSON error */ }
+    throw new ApiError(message,response.status)
+  }
+
   if (response.status === 204 || response.headers.get('content-length') === '0') return undefined as T
-  const raw = await response.text()
-  return raw ? JSON.parse(raw) as T : undefined as T
+  const raw=await response.text()
+  if (!raw) return undefined as T
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    throw new ApiError('Сервер вернул ответ в неожиданном формате.',response.status)
+  }
 }
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
 function backendListingPayload(input:ListingInput) {
@@ -272,7 +312,19 @@ export const api = {
     if (!account || !await matchesDemoPassword(password,account.digest)) throw new Error('Неверный логин или пароль')
     storeSession({ user: account.user, token: 'demo-only' }); return account.user
   },
-  async currentUser(): Promise<User | null> { if (isDemo) return getSession()?.user ?? null; if (!getSession()) return null; try { return await request<User>('/api/auth/me') } catch { storeSession(null); return null } },
+  async currentUser(): Promise<User | null> {
+    if (isDemo) return getSession()?.user ?? null
+    if (!getSession()) return null
+    try {
+      return await request<User>('/api/auth/me')
+    } catch(error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        storeSession(null)
+        return null
+      }
+      return getSession()?.user ?? null
+    }
+  },
   logout() { storeSession(null) },
   async create(input: ListingInput): Promise<Apartment> {
     if (!isDemo) {
