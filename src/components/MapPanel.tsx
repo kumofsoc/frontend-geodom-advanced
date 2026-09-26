@@ -158,13 +158,19 @@ export function MapPanel({
     const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
 
     if (signature && signature !== fittedSignature.current && !workPicking) {
-      const bounds = valid
+      const points = valid
         .map(item => validCoordinate(item.latitude,item.longitude))
         .filter((point):point is { lat:number; lon:number } => point !== null)
-        .map(point => [point.lat,point.lon])
 
-      if (bounds.length > 1) instance.setBounds(bounds,{ checkZoomRange:true,zoomMargin:[48,48] })
-      else if (bounds.length === 1) instance.setCenter(bounds[0],13)
+      if (points.length > 1) {
+        const latitudes = points.map(point => point.lat)
+        const longitudes = points.map(point => point.lon)
+        const bounds = [
+          [Math.min(...latitudes),Math.min(...longitudes)],
+          [Math.max(...latitudes),Math.max(...longitudes)]
+        ]
+        instance.setBounds(bounds,{ checkZoomRange:true,zoomMargin:[48,48] })
+      } else if (points.length === 1) instance.setCenter([points[0].lat,points[0].lon],13)
       fittedSignature.current = signature
     }
 
