@@ -62,10 +62,10 @@ npm run build
 ## Структура
 
 - `src/pages/Catalog.tsx` — аналитический главный экран, карта, фильтры, квартиры.
-- `src/pages/Detail.tsx` — готовый DTO квартиры, инфраструктура, будущие объекты, оценка и сохранение.
+- `src/pages/Detail.tsx` — готовый DTO квартиры, инфраструктура, будущие объекты, оценка, ипотечный сценарий и сохранение.
 - `src/pages/Report.tsx` — клиентский printable/PDF-отчёт по последней успешной подборке.
 - `src/pages/Compare.tsx` — отдельный comparison workspace; сравнение больше не висит поверх карты/каталога.
-- `src/components/PreferencePanel.tsx`, `RecommendationResults.tsx`, `ScorePanel.tsx` — параметры, персональная выдача, предупреждения и сравнение.
+- `src/components/PreferencePanel.tsx`, `RecommendationResults.tsx`, `ScorePanel.tsx`, `MortgageCalculator.tsx` — параметры, персональная выдача, объяснение score и финансовый сценарий.
 - `src/pages/Auth.tsx`, `Account.tsx`, `ListingForm.tsx` — пользовательский сценарий.
 - `src/components/MapPanel.tsx` — Yandex Maps, квартиры/районы, zoom-aware маркеры и выбор места работы; геопризнаки на клиенте не считает.
 - `src/store/useGeoDomStore.ts` — Zustand-store для auth/UI, параметров, фильтров, сохранённых и сравниваемых квартир.
@@ -73,7 +73,7 @@ npm run build
 - `src/lib/recommendations.ts` — mock-рекомендация, нормализация API-ответа и хранение локальных демо-событий.
 - `src/data/demo.ts` — явно вымышленные данные для демонстрации интерфейса.
 
-В MVP нет ипотеки, аренды, чата, платежей и отдельной админ-панели: это вне исходного ТЗ.
+Ипотечное оформление и банковская интеграция не являются ядром MVP, но в карточке квартиры есть локальный аннуитетный калькулятор как инструмент сравнения сценариев. Он не подбирает банк и не является офертой. Аренды, чата, платежей и отдельной админ-панели пока нет.
 
 
 ## Geo parquet и пропуски
@@ -135,3 +135,20 @@ npm run dev
 В production unverified media с `publication_allowed=false` локальным fallback не показывается. Для закрытого dev-demo оно доступно через `VITE_ALLOW_UNVERIFIED_LOCAL_MEDIA=true`.
 
 После готовности выдачи фото из Go API этот bridge удаляется без изменения UI-компонентов: компоненты уже работают через общий `resolvePhotoUrl()`.
+
+
+## Районы Красноярска
+
+Форма создания объявления содержит явный выбор одного из 7 административных районов: Железнодорожный, Кировский, Ленинский, Октябрьский, Свердловский, Советский и Центральный. В demo-режиме выбранный район сразу сохраняется в объекте. При подключённом backend район остаётся frontend-подсказкой до расширения серверного `ApartmentInput`; текущий Go backend по-прежнему определяет `district_id` после геокодирования адреса.
+
+## Docker / Compose
+
+Подготовлен production-style frontend image и отдельный Compose service:
+
+```bash
+cp .env.example .env
+docker compose build
+docker compose up -d
+```
+
+По умолчанию frontend доступен на `http://localhost:3000`, health check — `/healthz`. Временные локальные фото монтируются из `./public/media` read-only и не встраиваются в каждый слой image. Детали и план подключения Go container: `docs/docker.md`.

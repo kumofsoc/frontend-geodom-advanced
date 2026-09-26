@@ -155,6 +155,12 @@ export function Compare() {
           return [apartment.building_type,apartment.building_year].filter(Boolean).join(' · ') || '—'
         }}/>
         <CompareRow label="Ремонт" ids={comparedIds} render={id => details.find(item => item.id === id)?.apartment?.renovation || '—'}/>
+        <CompareRow label="Источник" ids={comparedIds} wrap render={id => {
+          const apartment=details.find(item => item.id === id)?.apartment
+          return apartment?.source_url
+            ? <a className="compare-source-link" href={apartment.source_url} target="_blank" rel="noopener noreferrer">{apartment.upstream_source?.toLowerCase() === 'sibdom' ? 'СИБДОМ' : apartment.upstream_source || 'Оригинал'} <ArrowUpRight size={13}/></a>
+            : '—'
+        }}/>
 
         <div className="compare-section-row">Персональные факторы</div>
         {factorRows.map(({key,label}) => <CompareRow key={key} label={label} ids={comparedIds} render={id => {

@@ -1,4 +1,5 @@
 import type { Apartment, CatalogFilters, ListingInput } from '../types'
+import { isKrasnoyarskDistrict } from './krasnoyarsk'
 
 export function filterApartments(items:Apartment[],filters:CatalogFilters) {
   const query=filters.query.trim().toLocaleLowerCase('ru')
@@ -31,6 +32,7 @@ export function validateApartment(input:ListingInput):string[] {
   const errors:string[]=[]
   if (!input.title.trim()) errors.push('Укажите название объявления')
   if (!input.address.trim()) errors.push('Укажите адрес')
+  if (!isKrasnoyarskDistrict(input.district_name)) errors.push('Выберите один из 7 районов Красноярска')
   if (!Number.isFinite(input.price) || input.price <= 0) errors.push('Цена должна быть больше нуля')
   if (!Number.isFinite(input.area) || input.area <= 0) errors.push('Площадь должна быть больше нуля')
   if (!Number.isInteger(input.rooms) || input.rooms < 0) errors.push('Укажите корректное число комнат')

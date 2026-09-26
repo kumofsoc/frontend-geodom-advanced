@@ -30,11 +30,12 @@
 .yandex-price-pin.compact:hover .price-full{display:inline}
 .yandex-price-pin.muted{opacity:.22}
 .yandex-price-pin.muted:hover{opacity:1}
-.yandex-district-pin{transform:translate3d(-50%,-100%,0);min-width:116px;display:grid;justify-items:center;gap:3px;background:#09a66b;color:#fff;padding:9px 12px 8px;border-radius:10px;box-shadow:0 8px 20px #0f644d42;font:800 10px/1.15 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;user-select:none}
-.yandex-district-pin>span{font-size:10px;letter-spacing:.1px}.yandex-district-pin>div{display:flex;align-items:baseline;gap:3px}.yandex-district-pin b{font-size:18px}.yandex-district-pin em{font-style:normal;font-size:8px;opacity:.75}.yandex-district-pin small{font-size:7.5px;font-weight:700;opacity:.82}
-.yandex-district-pin.active{background:#087c51;outline:3px solid #b9eed8}
-.yandex-district-dot{width:15px;height:15px;border-radius:50%;transform:translate3d(-50%,-50%,0);background:#0aa86c;border:3px solid #fff;box-shadow:0 3px 10px #0d624b55;backface-visibility:hidden}
-.yandex-district-dot.active{width:19px;height:19px;background:#087c51;box-shadow:0 0 0 4px #b9eed899,0 4px 12px #0d624b55}
+.yandex-district-pin{transform:translate3d(-50%,-100%,0);min-width:88px;display:grid;justify-items:center;gap:2px;background:#09a66b;color:#fff;padding:6px 8px 6px;border-radius:8px;box-shadow:0 5px 13px #0f644d35;font:800 8.5px/1.1 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;user-select:none;transition:transform .12s,box-shadow .12s,opacity .12s}
+.yandex-district-pin>span{font-size:8.5px;letter-spacing:.05px}.yandex-district-pin>div{display:flex;align-items:baseline;gap:2px}.yandex-district-pin b{font-size:14px}.yandex-district-pin em{font-style:normal;font-size:7px;opacity:.76}.yandex-district-pin small{font-size:6.5px;font-weight:700;opacity:.8}
+.yandex-district-pin:hover{transform:translate3d(-50%,-100%,0) scale(1.06);box-shadow:0 9px 20px #0f644d52}
+.yandex-district-pin.active{background:#087c51;outline:2px solid #b9eed8}
+.yandex-district-dot{width:12px;height:12px;border-radius:50%;transform:translate3d(-50%,-50%,0);background:#0aa86c;border:2px solid #fff;box-shadow:0 3px 8px #0d624b48;backface-visibility:hidden}
+.yandex-district-dot.active{width:16px;height:16px;background:#087c51;box-shadow:0 0 0 3px #b9eed899,0 4px 10px #0d624b55}
 .work-pick-hint{position:absolute;z-index:500;left:50%;top:14px;transform:translateX(-50%);background:#102d50e8;color:#fff;border-radius:8px;padding:9px 13px;font-size:10px;font-weight:800;box-shadow:0 8px 20px #102d5038;pointer-events:none;white-space:nowrap}
 .map-load-error{position:absolute;z-index:450;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px;background:#eef4f9;color:#486581}
 .map-load-error b{font-size:14px;color:#264867}
@@ -210,3 +211,24 @@
 .active-filter-chips button{display:inline-flex;align-items:center;gap:6px;border:1px solid #dce8f4;background:#fff;border-radius:999px;padding:7px 9px;color:#42627f;font-size:8.5px;font-weight:800}
 .active-filter-chips button:hover{background:#eef6ff;border-color:#b9d5f1}.active-filter-chips button span{font-size:13px;line-height:1;color:#7f95aa}
 .active-filter-chips .clear-all{border-color:transparent;background:transparent;color:#8a9db0}
+
+/* Keep the hovered apartment marker visually above dense neighbors. */
+.yandex-price-pin:hover{transform:translate3d(-50%,-100%,0) scale(1.08);filter:saturate(1.08)}
+.yandex-price-pin.compact:hover{transform:translate3d(-50%,-100%,0) scale(1.08)}
+
+
+/* Mortgage calculator */
+.mortgage-calculator{margin-top:10px;padding:16px;border:1px solid #dfe8f2;border-radius:12px;background:#fff}
+.mortgage-head{display:flex;align-items:center;gap:10px;margin-bottom:13px}.mortgage-head>span{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#edf5ff;color:#2479dc}.mortgage-head small{display:block;font-size:7px;font-weight:800;letter-spacing:.8px;color:#93a5b7}.mortgage-head h3{margin:3px 0 0;font-size:13px;color:#213f5d}
+.mortgage-fields{display:grid;gap:9px}.mortgage-fields label>span{display:block;margin-bottom:5px;font-size:8px;font-weight:800;color:#6f8498}.mortgage-fields input,.mortgage-fields select{width:100%;height:38px;border:1px solid #dfe8f2;border-radius:7px;background:#f8fbfe;padding:0 9px;color:#24435f;font:700 10px Manrope,Arial,sans-serif}.mortgage-fields label>small{display:block;margin-top:4px;font-size:7px;color:#94a5b5;line-height:1.35}
+.mortgage-result{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.mortgage-result>div{padding:10px;border-radius:8px;background:#f6f9fc}.mortgage-result span,.mortgage-result b{display:block}.mortgage-result span{font-size:7px;color:#8599ac}.mortgage-result b{margin-top:4px;font-size:10px;color:#274764}.mortgage-result .primary{background:#102d50}.mortgage-result .primary span{color:#91b4d2}.mortgage-result .primary b{color:#fff;font-size:13px}
+.mortgage-note{display:flex;align-items:flex-start;gap:7px;margin:10px 0 0;padding-top:10px;border-top:1px solid #e8eef4;color:#8195a8;font-size:7.5px;line-height:1.45}.mortgage-note svg{flex:none;color:#4e82b4}
+@media(max-width:900px){.mortgage-calculator{margin-top:0}}
+@media(max-width:460px){.mortgage-result{grid-template-columns:1fr}}
+
+
+/* Original listing source actions */
+.card-source-link{display:flex;align-items:center;justify-content:center;gap:5px;margin:0 14px 13px;padding:8px 9px;border:1px solid #e1e9f1;border-radius:7px;background:#f8fbfe;color:#6b8196;font-size:8px;font-weight:800}
+.card-source-link:hover{border-color:#b9d5f1;background:#eef6ff;color:#1e71cf}
+.compare-source-link{display:inline-flex;align-items:center;gap:4px;color:#1e73d1;font-weight:800}
+.compare-source-link:hover{text-decoration:underline}

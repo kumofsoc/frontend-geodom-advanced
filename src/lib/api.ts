@@ -31,6 +31,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return raw ? JSON.parse(raw) as T : undefined as T
 }
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
+function backendListingPayload(input:ListingInput) {
+  const payload:Partial<ListingInput>={ ...input }
+  delete payload.district_name
+  return payload
+}
+
 async function imageData(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height))
@@ -84,15 +90,28 @@ export const api = {
   async currentUser(): Promise<User | null> { if (isDemo) return getSession()?.user ?? null; if (!getSession()) return null; try { return await request<User>('/api/auth/me') } catch { storeSession(null); return null } },
   logout() { storeSession(null) },
   async create(input: ListingInput): Promise<Apartment> {
-    if (!isDemo) return request<Apartment>('/api/apartments', { method: 'POST', body: JSON.stringify(input) })
+    if (!isDemo) {
+      return request<Apartment>('/api/apartments', { method:'POST',body:JSON.stringify(backendListingPayload(input)) })
+    }
     const owner = getSession()?.user; if (!owner) throw new Error('Для публикации войдите в аккаунт')
-    const item: Apartment = { id: createId(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:'pending', name:'Уточняется', description:'Район определит сервер после подключения API.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
+    const districtName=input.district_name || 'Уточняется'
+    const item: Apartment = { id: createId(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:districtName === 'Уточняется' ? 'pending' : districtName.toLocaleLowerCase('ru').replace(/\s+/g,'-'), name:districtName, description:districtName === 'Уточняется' ? 'Район не указан.' : 'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
     save(homesKey, [...read<Apartment[]>(homesKey, []), item]); return item
   },
   async update(id: string, input: ListingInput): Promise<Apartment> {
-    if (!isDemo) return request<Apartment>(`/api/apartments/${encodeURIComponent(id)}`, { method:'PATCH', body:JSON.stringify(input) })
+    if (!isDemo) {
+      return request<Apartment>(`/api/apartments/${encodeURIComponent(id)}`, { method:'PATCH',body:JSON.stringify(backendListingPayload(input)) })
+    }
     const items = read<Apartment[]>(homesKey, []); const index = items.findIndex(x => x.id === id && x.owner_id === getSession()?.user.id)
-    if (index < 0) throw new Error('Объявление не найдено'); items[index] = { ...items[index], ...input }; save(homesKey, items); return items[index]
+    if (index < 0) throw new Error('Объявление не найдено')
+    items[index] = {
+      ...items[index],
+      ...input,
+      district:input.district_name
+        ? { ...items[index].district,name:input.district_name,description:'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }
+        : items[index].district
+    }
+    save(homesKey, items); return items[index]
   },
   async hide(id: string): Promise<void> {
     if (!isDemo) { await request(`/api/apartments/${encodeURIComponent(id)}`, { method:'DELETE' }); return }
