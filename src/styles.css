@@ -15,6 +15,9 @@
 /* Yandex map + workplace picker */
 .yandex-map-wrapper{background:#dfe8f0}
 .yandex-map-wrapper.work-picking .map-canvas{cursor:crosshair}
+.yandex-apartment-dot{width:10px;height:10px;border-radius:50%;transform:translate3d(-50%,-50%,0);background:#2e84f4;border:2px solid #fff;box-shadow:0 2px 7px #193e7945;backface-visibility:hidden}
+.yandex-apartment-dot.muted{opacity:.28}
+.yandex-apartment-dot:hover{box-shadow:0 3px 10px #193e7960}
 .yandex-price-pin{transform:translate3d(-50%,-100%,0);display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:32px;padding:0 11px;background:#fff;color:#146ae0;border:2px solid #2e84f4;box-shadow:0 5px 14px #193e7938;border-radius:18px;font:800 10px/1 Manrope,Arial,sans-serif;white-space:nowrap;backface-visibility:hidden;will-change:auto;user-select:none;contain:layout paint;transition:opacity .14s,border-color .14s,box-shadow .14s}
 .yandex-price-pin span{pointer-events:none}
 .yandex-price-pin:hover{border-color:#0f6fe8;box-shadow:0 7px 18px #193e7952}
