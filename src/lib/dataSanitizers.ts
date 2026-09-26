@@ -36,6 +36,21 @@ export function parseWktPoint(value: unknown): { lat: number; lon: number } | nu
   return validCoordinate(Number(match[2]), Number(match[1]))
 }
 
+function pointFromRaw(raw: Record<string, unknown>): { lat:number; lon:number } | null {
+  const direct = validCoordinate(raw.latitude ?? raw.lat,raw.longitude ?? raw.lon ?? raw.lng)
+  if (direct) return direct
+
+  if (raw.geometry && typeof raw.geometry === 'object' && !Array.isArray(raw.geometry)) {
+    const geometry = raw.geometry as { type?:unknown; coordinates?:unknown }
+    if (String(geometry.type).toLowerCase() === 'point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+      const point = validCoordinate(geometry.coordinates[1],geometry.coordinates[0])
+      if (point) return point
+    }
+  }
+
+  return parseWktPoint(raw.geometry)
+}
+
 export interface GeoObject {
   id: string
   osmType: string | null
@@ -55,7 +70,7 @@ export interface GeoObject {
 }
 
 export function normalizeGeoObject(raw: Record<string, unknown>): GeoObject | null {
-  const point = parseWktPoint(raw.geometry)
+  const point = pointFromRaw(raw)
   if (!point) return null
 
   const id = cleanText(raw.osm_id) || cleanText(raw.source_id)
@@ -87,8 +102,16 @@ export function normalizeGeoObject(raw: Record<string, unknown>): GeoObject | nu
 }
 
 export function normalizeGeoObjects(raw: unknown): GeoObject[] {
-  if (!Array.isArray(raw)) return []
-  return raw
+  const rows = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? ((raw as { items?:unknown; data?:unknown; results?:unknown }).items
+        ?? (raw as { data?:unknown }).data
+        ?? (raw as { results?:unknown }).results)
+      : []
+
+  if (!Array.isArray(rows)) return []
+  return rows
     .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item))
     .map(normalizeGeoObject)
     .filter((item): item is GeoObject => item !== null)
