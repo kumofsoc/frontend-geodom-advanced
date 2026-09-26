@@ -66,3 +66,5 @@
 .score-explanation>div span{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8.5px;color:#627b94}
 .score-explanation>div b{font-weight:700}.score-explanation>div em{font-style:normal;color:#0d9a64;font-weight:800}
 .score-explanation>small{display:block;margin-top:7px;font-size:7.5px;line-height:1.45;color:#9aabba}
+
+.money-preview{margin-top:5px;padding-left:2px;font-size:8.5px;font-weight:700;color:#879bb0;letter-spacing:.1px}
