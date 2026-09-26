@@ -1,5 +1,5 @@
 import { ArrowRight, MapPin, RotateCcw, Trash2, X } from 'lucide-react'
-import type { CatalogFilters, RecommendationRequest } from '../types'
+import type { CatalogFilters, HousingIntent, RecommendationRequest } from '../types'
 
 const priorities: Array<{ key:keyof RecommendationRequest['priorities']; label:string }> = [
   { key:'schools', label:'Школы' }, { key:'parks', label:'Парки' }, { key:'transport', label:'Транспорт' },
@@ -25,7 +25,9 @@ export function PreferencePanel({
   open,
   onClose,
   workPicking,
-  onStartWorkPick
+  onStartWorkPick,
+  intent,
+  onIntent
 }:{
   value:RecommendationRequest
   onChange:(value:RecommendationRequest)=>void
@@ -41,6 +43,8 @@ export function PreferencePanel({
   onClose:()=>void
   workPicking:boolean
   onStartWorkPick:()=>void
+  intent:HousingIntent
+  onIntent:(intent:HousingIntent)=>void
 }) {
   return <aside className={`dashboard-sidebar preferences-sidebar ${open ? 'open' : ''}`}>
     <div className="sidebar-heading">
@@ -50,12 +54,20 @@ export function PreferencePanel({
     </div>
     <form onSubmit={e => { e.preventDefault(); void onApply().then(ok => { if (ok) onClose() }) }}>
       <div className="sidebar-block">
-        <label className="sidebar-label" htmlFor="budget-max">Бюджет на жильё, ₽</label>
+        <span className="sidebar-label">Цель поиска</span>
+        <div className="intent-toggle" role="group" aria-label="Купить или снять">
+          <button type="button" className={intent === 'buy' ? 'selected' : ''} onClick={() => onIntent('buy')}>Купить</button>
+          <button type="button" className={intent === 'rent' ? 'selected' : ''} onClick={() => onIntent('rent')}>Снять</button>
+        </div>
+        {intent === 'rent' && <div className="sidebar-info">Backend Case 2 сейчас возвращает каталог продажи. Режим аренды сохраняется как пользовательское намерение, но не подменяет данные покупки арендными mock-объектами.</div>}
+        <label className="sidebar-label inline" htmlFor="budget-max">{intent === 'rent' ? 'Бюджет аренды, ₽/мес' : 'Бюджет на жильё, ₽'}</label>
         <input id="budget-max" type="number" inputMode="numeric" min="1" step="1" value={value.budget_max || ''} onChange={e => onChange({...value,budget_max:e.target.value === '' ? 0 : Number(e.target.value)})} required/>
         <div className="money-preview">{value.budget_max > 0 ? new Intl.NumberFormat('ru-RU').format(value.budget_max) + ' ₽' : 'Введите любую сумму'}</div>
-        <label className="sidebar-label inline" htmlFor="down-payment">Первоначальный взнос, ₽</label>
-        <input id="down-payment" type="number" inputMode="numeric" min="0" step="1" value={value.down_payment || ''} onChange={e => onChange({...value,down_payment:e.target.value === '' ? 0 : Number(e.target.value)})}/>
-        <div className="money-preview">{value.down_payment > 0 ? new Intl.NumberFormat('ru-RU').format(value.down_payment) + ' ₽' : 'Без первоначального взноса'}</div>
+        {intent === 'buy' && <>
+          <label className="sidebar-label inline" htmlFor="down-payment">Первоначальный взнос, ₽</label>
+          <input id="down-payment" type="number" inputMode="numeric" min="0" step="1" value={value.down_payment || ''} onChange={e => onChange({...value,down_payment:e.target.value === '' ? 0 : Number(e.target.value)})}/>
+          <div className="money-preview">{value.down_payment > 0 ? new Intl.NumberFormat('ru-RU').format(value.down_payment) + ' ₽' : 'Без первоначального взноса'}</div>
+        </>}
       </div>
 
       <div className="sidebar-block">
