@@ -2,6 +2,7 @@ import { demoApartments } from '../data/demo'
 import { demoGeoRows } from '../data/demoGeoObjects'
 import { demoRecommend, logDemoEvent, normalizeRecommendation, rememberRecommendation } from './recommendations'
 import { normalizeGeoObjects, type GeoObject } from './dataSanitizers'
+import { buildDistrictStats, type DistrictStats } from './districtStats'
 import { createId, demoPasswordDigest, matchesDemoPassword } from './id'
 import { withLocalHousingMedia } from './media'
 import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
@@ -63,6 +64,35 @@ export const api = {
     return (await request<Apartment[]>('/api/apartments')).map(withLocalHousingMedia)
   },
   async geoObjects(): Promise<GeoObject[]> { if (isDemo) { await delay(); return normalizeGeoObjects(demoGeoRows) } return normalizeGeoObjects(await request<unknown>('/api/geo-objects')) },
+  async districtStats(): Promise<DistrictStats[]> {
+    if (isDemo) {
+      await delay()
+      return buildDistrictStats(demoHomes().filter(x => x.status === 'published').map(withLocalHousingMedia))
+    }
+    const rows = await request<Array<{
+      id:number|string
+      name:string
+      apartment_count:number
+      median_price?:number|null
+      median_price_m2?:number|null
+      median_area?:number|null
+      photo_coverage?:number|null
+      min_price?:number|null
+      max_price?:number|null
+    }>>('/api/district-stats')
+    return rows.map(row => ({
+      id:String(row.id),
+      name:row.name as DistrictStats['name'],
+      count:Number(row.apartment_count || 0),
+      medianPrice:row.median_price ?? null,
+      medianPriceM2:row.median_price_m2 ?? null,
+      medianArea:row.median_area ?? null,
+      averageScore:null,
+      photoCoverage:row.photo_coverage ?? null,
+      minPrice:row.min_price ?? null,
+      maxPrice:row.max_price ?? null
+    }))
+  },
   async detail(id: string): Promise<Apartment> {
     if (isDemo) {
       await delay()
