@@ -1,15 +1,34 @@
 import type { Apartment, CatalogFilters, ListingInput } from '../types'
-export function filterApartments(items: Apartment[], filters: CatalogFilters) {
-  const query = filters.query.trim().toLocaleLowerCase('ru')
-  return items.filter(a => a.status === 'published'
-    && (!filters.district || a.district.name === filters.district)
-    && (!filters.maxPrice || a.price <= filters.maxPrice)
-    && (!filters.rooms || a.rooms === filters.rooms)
-    && (!query || `${a.title} ${a.address} ${a.district.name}`.toLocaleLowerCase('ru').includes(query)))
-    .sort((a, b) => filters.sort === 'price_asc' ? a.price - b.price : filters.sort === 'price_desc' ? b.price - a.price : filters.sort === 'area_desc' ? b.area - a.area : (b.recommendation.score ?? -1) - (a.recommendation.score ?? -1))
+
+export function filterApartments(items:Apartment[],filters:CatalogFilters) {
+  const query=filters.query.trim().toLocaleLowerCase('ru')
+  return items.filter(apartment => {
+    const photoCount=apartment.photo_count ?? apartment.photos.length
+    const roomsMatch=!filters.rooms || (filters.rooms >= 4 ? apartment.rooms >= 4 : apartment.rooms === filters.rooms)
+    const yearMatch=!filters.yearFrom || (apartment.building_year != null && apartment.building_year >= filters.yearFrom)
+    const buildingTypeMatch=!filters.buildingType || apartment.building_type === filters.buildingType
+    const searchText=`${apartment.title} ${apartment.address} ${apartment.district.name} ${apartment.complex_name || ''}`.toLocaleLowerCase('ru')
+
+    return apartment.status === 'published'
+      && (!filters.district || apartment.district.name === filters.district)
+      && (!filters.maxPrice || apartment.price <= filters.maxPrice)
+      && roomsMatch
+      && (!filters.minArea || apartment.area >= filters.minArea)
+      && yearMatch
+      && buildingTypeMatch
+      && (!filters.onlyWithPhotos || photoCount > 0)
+      && (!query || searchText.includes(query))
+  }).sort((a,b) => filters.sort === 'price_asc'
+    ? a.price-b.price
+    : filters.sort === 'price_desc'
+      ? b.price-a.price
+      : filters.sort === 'area_desc'
+        ? b.area-a.area
+        : (b.recommendation.score ?? -1)-(a.recommendation.score ?? -1))
 }
-export function validateApartment(input: ListingInput): string[] {
-  const errors: string[] = []
+
+export function validateApartment(input:ListingInput):string[] {
+  const errors:string[]=[]
   if (!input.title.trim()) errors.push('Укажите название объявления')
   if (!input.address.trim()) errors.push('Укажите адрес')
   if (!Number.isFinite(input.price) || input.price <= 0) errors.push('Цена должна быть больше нуля')
@@ -20,6 +39,7 @@ export function validateApartment(input: ListingInput): string[] {
   if (input.floor > input.total_floors) errors.push('Этаж не может превышать этажность дома')
   return errors
 }
-export const price = (n: number) => new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
-export const area = (n: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n) + ' м²'
-export const distance = (n: number) => n < 1000 ? `${n} м` : `${(n / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`
+
+export const price=(n:number) => new Intl.NumberFormat('ru-RU').format(n)+' ₽'
+export const area=(n:number) => new Intl.NumberFormat('ru-RU',{ maximumFractionDigits:1 }).format(n)+' м²'
+export const distance=(n:number) => n < 1000 ? `${n} м` : `${(n/1000).toLocaleString('ru-RU',{ maximumFractionDigits:1 })} км`
