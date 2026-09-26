@@ -46,7 +46,7 @@ export interface RecommendationItem {
   price: number
   price_m2: number
   predicted_price_m2: number | null
-  score: number
+  score: number | null
   scores: { schools: number | null; parks: number | null; transport: number | null; ecology: number | null; safety: number | null; commute: number | null; price: number | null }
   contributions?: Partial<Record<'schools' | 'parks' | 'transport' | 'ecology' | 'safety' | 'commute' | 'price', number>>
   commute_minutes: number | null
