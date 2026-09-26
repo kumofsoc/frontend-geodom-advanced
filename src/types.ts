@@ -81,3 +81,106 @@ export interface DistrictMarketStats {
   avg_transport_stops_1km?:number
   updated_at?:string
 }
+
+
+export type HousingIntent='buy'|'rent'
+
+export interface Paginated<T> {
+  items:T[]
+  limit:number
+  offset:number
+  hasMore:boolean
+}
+
+export interface GeoBounds {
+  minLat:number
+  maxLat:number
+  minLon:number
+  maxLon:number
+}
+
+export interface DistrictAnalysis {
+  id:string
+  name:string
+  overallScore:number|null
+  scores:{
+    transport:number|null
+    ecology:number|null
+    schools:number|null
+    safety:number|null
+    infrastructure:number|null
+  }
+  apartmentCount:number
+  medianPrice:number|null
+  medianPriceM2:number|null
+  coverage:number|null
+  updatedAt:string|null
+  sourceName:string
+  sourceUrl:string|null
+  warnings:string[]
+}
+
+export interface ResidentialComplex {
+  id:string
+  name:string
+  developer:string|null
+  address:string|null
+  latitude:number|null
+  longitude:number|null
+  plannedCompletionYear:number|null
+  sourceName:string
+  sourceId:string
+  sourceUrl:string|null
+  apartmentCount:number
+  minPrice:number|null
+  medianPrice:number|null
+  updatedAt:string|null
+}
+
+export interface MortgageCalculationRequest {
+  apartment_price:number
+  down_payment:number
+  annual_rate:number
+  term_years:number
+}
+
+export interface MortgageCalculationResponse {
+  loan_amount:number
+  monthly_payment:number
+  total_payment:number
+  overpayment:number
+  annual_rate:number
+  term_years:number
+  term_months:number
+}
+
+export interface RentVsBuyAssumptions {
+  horizon_years:number
+  monthly_rent:number
+  rent_growth_percent:number
+  home_growth_percent:number
+  maintenance_percent:number
+  investment_return_percent:number
+  purchase_costs_percent:number
+  sale_costs_percent:number
+}
+
+export interface RentVsBuyBackendRequest extends RentVsBuyAssumptions {
+  apartment_price:number
+  down_payment:number
+  annual_rate:number
+  mortgage_years:number
+}
+
+export interface RentVsBuyBackendResponse {
+  mortgage_monthly:number
+  rent_monthly:number
+  ownership_total:number
+  rent_total:number
+  break_even_year:number|null
+  horizon_years:number
+  assumptions:RentVsBuyAssumptions
+  source_name:string
+  updated_at:string|null
+  warnings:string[]
+}
