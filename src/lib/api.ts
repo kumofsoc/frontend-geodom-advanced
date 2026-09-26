@@ -32,9 +32,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
 function backendListingPayload(input:ListingInput) {
-  const payload:Partial<ListingInput>={ ...input }
-  delete payload.district_name
-  return payload
+  return { ...input }
 }
 
 async function imageData(file: File): Promise<string> {
