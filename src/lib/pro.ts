@@ -94,3 +94,33 @@ export function leadAnalytics(leads:ProLead[]) {
     topPriorities:[...priorityCounts.entries()].sort((a,b) => b[1]-a[1]).slice(0,5)
   }
 }
+
+
+export type LeadStage='new'|'contacted'|'viewing'|'won'|'lost'
+
+const leadPipelineKey='geodom-pro-lead-pipeline-v1'
+
+export function loadLeadPipeline():Record<string,LeadStage> {
+  try {
+    const parsed=JSON.parse(localStorage.getItem(leadPipelineKey) || '{}') as Record<string,unknown>
+    const allowed=new Set<LeadStage>(['new','contacted','viewing','won','lost'])
+    return Object.fromEntries(Object.entries(parsed).filter((entry):entry is [string,LeadStage] => allowed.has(entry[1] as LeadStage)))
+  } catch {
+    return {}
+  }
+}
+
+export function setLeadStage(leadId:string,stage:LeadStage) {
+  const pipeline={...loadLeadPipeline(),[leadId]:stage}
+  localStorage.setItem(leadPipelineKey,JSON.stringify(pipeline))
+  return pipeline
+}
+
+export function clearLeadStage(leadId:string) {
+  const pipeline=loadLeadPipeline()
+  delete pipeline[leadId]
+  localStorage.setItem(leadPipelineKey,JSON.stringify(pipeline))
+  return pipeline
+}
+
+export const proLeadPipelineStorageKey=leadPipelineKey
