@@ -126,3 +126,13 @@
 .map-layer-toggle>b{font-size:10px;text-align:left}.map-layer-toggle>small{font-size:8px!important;color:#8ba0b4!important;white-space:nowrap}.map-layer-toggle>svg:last-child{transition:transform .16s}.map-layer-panel.open .map-layer-toggle>svg:last-child{transform:rotate(180deg)}
 .map-layer-panel.collapsed{width:auto;min-width:132px;padding:6px 8px}.map-layer-panel.collapsed .map-layer-toggle{padding:4px!important}.map-layer-panel.collapsed .map-layer-toggle>small{display:none}
 @media(max-width:520px){.map-layer-panel{max-width:calc(100% - 16px)}.map-layer-panel.collapsed{min-width:112px}.map-layer-toggle>b{font-size:8px}}
+
+
+/* Post-MVP visual layer */
+.dashboard-intro{position:relative;overflow:hidden;isolation:isolate}
+.dashboard-intro>div:not(.city-signal){position:relative;z-index:2}
+.city-signal{position:absolute;z-index:0;right:175px;top:-26px;width:390px;height:175px;pointer-events:none;opacity:.92;filter:saturate(.96);mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 78%,transparent 100%)}
+.city-signal canvas{width:100%!important;height:100%!important}
+@media(max-width:1150px){.city-signal{right:10px;width:310px;opacity:.5}.dashboard-intro>div:first-child{max-width:720px}}
+@media(max-width:760px){.city-signal{display:none}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.home-card,.district-card,.yandex-price-pin,.yandex-district-pin,.yandex-district-dot{animation:none!important;transition:none!important}}
