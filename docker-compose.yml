@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
         VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
         VITE_LOCAL_MEDIA_BASE_URL: ${VITE_LOCAL_MEDIA_BASE_URL:-/media}
         VITE_ALLOW_UNVERIFIED_LOCAL_MEDIA: ${VITE_ALLOW_UNVERIFIED_LOCAL_MEDIA:-false}
