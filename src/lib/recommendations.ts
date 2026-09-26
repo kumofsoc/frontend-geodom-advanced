@@ -1,4 +1,5 @@
 import { demoApartments } from '../data/demo'
+import { cleanText, finiteNumber } from './dataSanitizers'
 import type { InteractionPayload, RecommendationItem, RecommendationRequest, RecommendationResponse } from '../types'
 
 const savedKey = 'geodom-saved-apartments-v1'
@@ -6,20 +7,68 @@ const eventKey = 'geodom-demo-events-v1'
 const lastKey = 'geodom-last-recommendation-v1'
 const clamp = (value: number) => Math.max(0, Math.min(10, value))
 const round = (value: number) => Math.round(value * 10) / 10
-function read<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(key) || '') as T } catch { return fallback } }
 
-type RawItem = Omit<Partial<RecommendationItem>, 'scores'> & Pick<RecommendationItem, 'apartment_id' | 'title' | 'price' | 'score'> & { scores?: Partial<RecommendationItem['scores']> }
-export function normalizeRecommendation(raw: { request_id:string; model_version:string; scoring_version:string; ml_available?:boolean; warnings?:string[]; items:RawItem[] }, origin:string): RecommendationResponse {
+function read<T>(key: string, fallback: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || '') as T }
+  catch { return fallback }
+}
+
+function nullableNumber(value: unknown) {
+  return finiteNumber(value)
+}
+
+function numberOr(value: unknown, fallback: number) {
+  return finiteNumber(value) ?? fallback
+}
+
+function textList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.map(cleanText).filter((item):item is string => item !== null)
+}
+
+function resolveMediaUrl(value: unknown, origin: string): string | null {
+  const url = cleanText(value)
+  if (!url) return null
+  if (!origin) return url
+  try { return new URL(url,origin).toString() }
+  catch { return null }
+}
+
+type RawItem = Omit<Partial<RecommendationItem>, 'scores'> & Pick<RecommendationItem, 'apartment_id'> & { scores?: Partial<RecommendationItem['scores']> }
+export function normalizeRecommendation(raw: {
+  request_id?:unknown
+  model_version?:unknown
+  scoring_version?:unknown
+  ml_available?:boolean
+  warnings?:unknown
+  items?:RawItem[]
+}, origin:string): RecommendationResponse {
   const keys: Array<keyof RecommendationItem['scores']> = ['schools','parks','transport','ecology','safety','commute','price']
+  const items = Array.isArray(raw.items) ? raw.items : []
   return {
-    request_id:raw.request_id, model_version:raw.model_version, scoring_version:raw.scoring_version,
-    ml_available:raw.ml_available ?? true, warnings:raw.warnings ?? [],
-    items:raw.items.map(item => ({
-      apartment_id:item.apartment_id, title:item.title, price:item.price, price_m2:item.price_m2 ?? 0,
-      predicted_price_m2:item.predicted_price_m2 ?? null, score:item.score,
-      scores:Object.fromEntries(keys.map(key => [key,item.scores?.[key] ?? null])) as RecommendationItem['scores'],
-      commute_minutes:item.commute_minutes ?? null, reasons:item.reasons ?? [], warnings:item.warnings ?? [],
-      cover_image_url:item.cover_image_url ? origin ? new URL(item.cover_image_url,origin).toString() : item.cover_image_url : null
+    request_id:cleanText(raw.request_id) || crypto.randomUUID(),
+    model_version:cleanText(raw.model_version) || 'unknown',
+    scoring_version:cleanText(raw.scoring_version) || 'unknown',
+    ml_available:raw.ml_available ?? true,
+    warnings:textList(raw.warnings),
+    items:items.map(item => ({
+      apartment_id:item.apartment_id,
+      title:cleanText(item.title) || 'Объект без названия',
+      price:numberOr(item.price,0),
+      price_m2:numberOr(item.price_m2,0),
+      predicted_price_m2:nullableNumber(item.predicted_price_m2),
+      score:numberOr(item.score,0),
+      scores:Object.fromEntries(keys.map(key => [key,nullableNumber(item.scores?.[key])])) as RecommendationItem['scores'],
+      contributions:item.contributions
+        ? Object.fromEntries(keys.flatMap(key => {
+            const value = nullableNumber(item.contributions?.[key])
+            return value === null ? [] : [[key,value]]
+          })) as RecommendationItem['contributions']
+        : undefined,
+      commute_minutes:nullableNumber(item.commute_minutes),
+      reasons:textList(item.reasons),
+      warnings:textList(item.warnings),
+      cover_image_url:resolveMediaUrl(item.cover_image_url,origin)
     }))
   }
 }
@@ -39,37 +88,79 @@ export function demoRecommend(input: RecommendationRequest): RecommendationRespo
     const parkWeight = input.priorities.parks
     const transportWeight = input.priorities.transport
     const weightTotal = schoolWeight + parkWeight + transportWeight + 1
-    const score = round((schools * schoolWeight + parks * parkWeight + transport * transportWeight + affordability) / weightTotal)
+    const schoolContribution = schools * schoolWeight / weightTotal
+    const parkContribution = parks * parkWeight / weightTotal
+    const transportContribution = transport * transportWeight / weightTotal
+    const priceContribution = affordability / weightTotal
+    const score = round(schoolContribution + parkContribution + transportContribution + priceContribution)
     return {
-      apartment_id: home.id, title: home.title, price: home.price, price_m2: Math.round(home.price / home.area),
-      predicted_price_m2: null, score,
-      scores: { schools, parks, transport, ecology: null, safety: null, commute: null, price: affordability },
-      commute_minutes: null,
-      reasons: [`${f.schools_1km} школы рядом (до 1 км)`, `Парк в ${f.nearest_park_m} м`, `Транспорт в ${f.nearest_transport_m} м`],
-      warnings: [], cover_image_url: home.photos[0]?.url || null
+      apartment_id:home.id,
+      title:home.title,
+      price:home.price,
+      price_m2:Math.round(home.price/home.area),
+      predicted_price_m2:null,
+      score,
+      scores:{ schools, parks, transport, ecology:null, safety:null, commute:null, price:affordability },
+      contributions:{
+        schools:round(schoolContribution),
+        parks:round(parkContribution),
+        transport:round(transportContribution),
+        price:round(priceContribution)
+      },
+      commute_minutes:null,
+      reasons:[`${f.schools_1km} школы рядом (до 1 км)`, `Парк в ${f.nearest_park_m} м`, `Транспорт в ${f.nearest_transport_m} м`],
+      warnings:[],
+      cover_image_url:home.photos[0]?.url || null
     }
-  }).sort((a,b) => b.score - a.score)
-  return { request_id: crypto.randomUUID(), model_version:'demo-no-model', scoring_version:'demo-weighted-v1', ml_available:false, warnings, items:items.slice(0,input.limit) }
+  }).sort((a,b) => b.score-a.score)
+  return {
+    request_id:crypto.randomUUID(),
+    model_version:'demo-no-model',
+    scoring_version:'demo-weighted-v1',
+    ml_available:false,
+    warnings,
+    items:items.slice(0,input.limit)
+  }
 }
 
 export function logDemoEvent(payload: InteractionPayload): void {
-  const events = read<Array<InteractionPayload & { timestamp: string }>>(eventKey, [])
+  const events = read<Array<InteractionPayload & { timestamp:string }>>(eventKey,[])
   events.push({ ...payload, timestamp:new Date().toISOString() })
-  localStorage.setItem(eventKey, JSON.stringify(events.slice(-500)))
+  localStorage.setItem(eventKey,JSON.stringify(events.slice(-500)))
 }
-export function readDemoEvents() { return read<Array<InteractionPayload & { timestamp: string }>>(eventKey, []) }
-export function rememberRecommendation(response: RecommendationResponse): void { sessionStorage.setItem(lastKey, JSON.stringify(response)) }
-export function getLastRecommendationItem(id: string): { response: RecommendationResponse; item: RecommendationItem } | null {
+
+export function readDemoEvents() {
+  return read<Array<InteractionPayload & { timestamp:string }>>(eventKey,[])
+}
+
+export function rememberRecommendation(response: RecommendationResponse): void {
+  localStorage.setItem(lastKey,JSON.stringify(response))
+}
+
+export function loadLastRecommendation(): RecommendationResponse | null {
   try {
-    const response = JSON.parse(sessionStorage.getItem(lastKey) || '') as RecommendationResponse
-    const item = response.items.find(candidate => String(candidate.apartment_id) === id)
-    return item ? { response, item } : null
-  } catch { return null }
+    const raw = JSON.parse(localStorage.getItem(lastKey) || '')
+    if (!raw || !Array.isArray(raw.items)) return null
+    return normalizeRecommendation(raw,'')
+  } catch {
+    return null
+  }
 }
-export function getSavedIds(): string[] { return read<string[]>(savedKey, []) }
+
+export function getLastRecommendationItem(id: string): { response:RecommendationResponse; item:RecommendationItem } | null {
+  const response = loadLastRecommendation()
+  if (!response) return null
+  const item = response.items.find(candidate => String(candidate.apartment_id) === id)
+  return item ? { response,item } : null
+}
+
+export function getSavedIds(): string[] {
+  return read<string[]>(savedKey,[])
+}
+
 export function toggleSavedId(id: string): boolean {
   const current = getSavedIds()
   const next = current.includes(id) ? current.filter(value => value !== id) : [...current,id]
-  localStorage.setItem(savedKey, JSON.stringify(next))
+  localStorage.setItem(savedKey,JSON.stringify(next))
   return next.includes(id)
 }
