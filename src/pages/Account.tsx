@@ -5,11 +5,11 @@ import { EmptyState, PageLoading } from '../components/Ui'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
 import { getSavedIds } from '../lib/recommendations'
-import { useAuth } from '../App'
+import { useGeoDomStore } from '../store/useGeoDomStore'
 import type { Apartment } from '../types'
 const status: Record<string,string> = { published:'Опубликовано', draft:'Черновик', hidden:'Скрыто', deleted:'Удалено' }
 export function Account() {
-  const { user,setUser } = useAuth(); const navigate = useNavigate(); const [items,setItems] = useState<Apartment[]>([]); const [savedItems,setSavedItems] = useState<Apartment[]>([]); const [loading,setLoading] = useState(true); const [error,setError] = useState(''); const [busy,setBusy] = useState('')
+  const user = useGeoDomStore(state => state.user); const setUser = useGeoDomStore(state => state.setUser); const navigate = useNavigate(); const [items,setItems] = useState<Apartment[]>([]); const [savedItems,setSavedItems] = useState<Apartment[]>([]); const [loading,setLoading] = useState(true); const [error,setError] = useState(''); const [busy,setBusy] = useState('')
   useEffect(() => { Promise.all([api.mine(),api.list()]).then(([mine,catalog]) => { setItems(mine); setSavedItems(catalog.filter(item => getSavedIds().includes(item.id))) }).catch(e => setError(e.message)).finally(() => setLoading(false)) },[])
   async function hide(item: Apartment) { if (!window.confirm('Скрыть объявление из каталога?')) return; setBusy(item.id); try { await api.hide(item.id); setItems(prev => prev.map(x => x.id === item.id ? {...x,status:'hidden'} : x)) } catch(e) { setError(e instanceof Error ? e.message : 'Не удалось скрыть объявление') } finally { setBusy('') } }
   function logout() { api.logout(); setUser(null); navigate('/') }
