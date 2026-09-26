@@ -39,12 +39,13 @@ export function MortgageCalculator({
 }) {
   const initialDown=Math.min(apartmentPrice,defaultDownPayment > 0 ? defaultDownPayment : Math.round(apartmentPrice*.2))
   const [downPayment,setDownPayment]=useState(initialDown)
-  const [annualRate,setAnnualRate]=useState(20)
+  const [annualRate,setAnnualRate]=useState<number|null>(null)
   const [years,setYears]=useState(20)
   const result=useMemo(
-    () => calculateMortgage(apartmentPrice,downPayment,annualRate,years),
+    () => annualRate === null ? null : calculateMortgage(apartmentPrice,downPayment,annualRate,years),
     [apartmentPrice,downPayment,annualRate,years]
   )
+  const principal=Math.max(0,apartmentPrice-Math.min(apartmentPrice,downPayment))
   const downPercent=apartmentPrice > 0 ? Math.round((Math.min(downPayment,apartmentPrice)/apartmentPrice)*100) : 0
 
   return <section className="mortgage-calculator" aria-labelledby="mortgage-title">
@@ -61,8 +62,8 @@ export function MortgageCalculator({
       </label>
       <label>
         <span>Ставка, % годовых</span>
-        <input type="number" min="0" max="100" step="0.1" value={annualRate} onChange={event => setAnnualRate(Math.max(0,Number(event.target.value)))}/>
-        <small>Введите ставку вашего банка/программы</small>
+        <input type="number" min="0" max="100" step="0.1" value={annualRate ?? ''} onChange={event => setAnnualRate(event.target.value === '' ? null : Math.max(0,Number(event.target.value)))} placeholder="Например, 18.5"/>
+        <small>GeoDom не подставляет «рыночную» ставку: введите условия вашего банка или программы</small>
       </label>
       <label>
         <span>Срок</span>
@@ -73,10 +74,10 @@ export function MortgageCalculator({
     </div>
 
     <div className="mortgage-result">
-      <div><span>Сумма кредита</span><b>{formatPrice(Math.round(result.principal))}</b></div>
-      <div className="primary"><span>Платёж в месяц</span><b>{formatPrice(Math.round(result.monthlyPayment))}</b></div>
-      <div><span>Переплата</span><b>{formatPrice(Math.round(result.overpayment))}</b></div>
-      <div><span>Всего выплат</span><b>{formatPrice(Math.round(result.totalPayment))}</b></div>
+      <div><span>Сумма кредита</span><b>{formatPrice(Math.round(principal))}</b></div>
+      <div className="primary"><span>Платёж в месяц</span><b>{result ? formatPrice(Math.round(result.monthlyPayment)) : 'Введите ставку'}</b></div>
+      <div><span>Переплата</span><b>{result ? formatPrice(Math.round(result.overpayment)) : '—'}</b></div>
+      <div><span>Всего выплат</span><b>{result ? formatPrice(Math.round(result.totalPayment)) : '—'}</b></div>
     </div>
 
     <p className="mortgage-note"><Landmark size={14}/> Расчёт аннуитетный и ориентировочный. Это не оферта банка: ставка, страховка, льготная программа и дополнительные расходы могут изменить итоговый платёж.</p>
