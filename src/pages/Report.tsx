@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { ArrowLeft, CircleAlert, FileText, MapPin, Printer, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
@@ -25,6 +26,18 @@ export function Report() {
   const preferences = useGeoDomStore(state => state.preferences)
   const response = loadLastRecommendation()
   const top = response?.items.slice(0,3) ?? []
+
+  useEffect(() => {
+    const first=response?.items[0]
+    if (!response || !first) return
+    void api.event({
+      request_id:response.request_id,
+      event:'report',
+      entity_type:'apartment',
+      entity_id:first.apartment_id,
+      position:1
+    }).catch(() => {})
+  },[response?.request_id])
 
   function printReport() {
     const first = top[0]
