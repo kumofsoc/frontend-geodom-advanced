@@ -24,6 +24,7 @@ export function DemandSharePanel() {
   const [message,setMessage]=useState('')
 
   if (!user) return null
+  const currentUser=user
 
   function save() {
     if (contact.trim().length < 3) {
@@ -32,7 +33,7 @@ export function DemandSharePanel() {
     }
     const next=buildSharedDemandProfile({
       current:profile,
-      user,
+      user:currentUser,
       contact,
       consentToContact:consent,
       preferences,
@@ -45,7 +46,7 @@ export function DemandSharePanel() {
 
   function revoke() {
     const next=revokeSharedDemandProfile()
-    if (next && next.userId === user.id) {
+    if (next && next.userId === currentUser.id) {
       setProfile(next)
       setConsent(false)
       setMessage('Согласие на передачу контакта отозвано.')
