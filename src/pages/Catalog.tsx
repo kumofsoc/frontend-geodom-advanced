@@ -62,6 +62,7 @@ export function Catalog() {
 
   const districts = useMemo(() => [...new Set(items.map(x => x.district.name))].filter(x => x !== 'Уточняется').sort(),[items])
   const visible = useMemo(() => filterApartments(items,filters),[items,filters])
+  const visibleIds = useMemo(() => new Set(visible.map(item => String(item.id))),[visible])
   const districtCards = useMemo(() => districts.map(name => {
     const group = items.filter(x => x.district.name === name)
     return {
@@ -183,14 +184,15 @@ export function Catalog() {
         <div className="map-panel" id="main-map">
           <div className="map-topbar">
             <div><span className="map-tab active"><MapPin size={16}/> Яндекс Карта</span><span className="map-tab secondary">Красноярск и районы</span></div>
-            <div className="map-topbar-note"><span className="pulse-dot"/> {workPicking ? 'Выберите место работы' : `${visible.length} предложений на карте`}</div>
+            <div className="map-topbar-note"><span className="pulse-dot"/> {workPicking ? 'Выберите место работы' : `${visible.length} из ${items.length} подходят фильтрам · все показаны`}</div>
           </div>
           {loading
             ? <PageLoading/>
             : error
               ? <EmptyState title="Карта недоступна" message={error}/>
               : <MapPanel
-                  items={visible}
+                  items={items}
+                  activeApartmentIds={visibleIds}
                   selectedDistrict={filters.district}
                   onDistrict={pickDistrict}
                   workLocation={preferences.work_location}
