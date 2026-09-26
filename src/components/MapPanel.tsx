@@ -10,7 +10,7 @@ type WorkLocation = { lat:number; lon:number } | null
 type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
 
 const CITY_OVERVIEW_MAX_ZOOM = 8
-const DISTRICT_CARD_MAX_ZOOM = 10
+const DISTRICT_CARD_MAX_ZOOM = 9
 const APARTMENT_CLUSTER_MIN_ZOOM = 11
 const APARTMENT_PRICE_MIN_ZOOM = 13
 const POI_MIN_ZOOM = 12
