@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        VITE_DATA_MODE: "live"
         VITE_API_URL: ${VITE_API_URL:?Set VITE_API_URL to the public GeoDom API origin}
         VITE_API_REQUEST_TIMEOUT_MS: ${VITE_API_REQUEST_TIMEOUT_MS:-15000}
         VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:?Set VITE_YANDEX_MAPS_API_KEY}
