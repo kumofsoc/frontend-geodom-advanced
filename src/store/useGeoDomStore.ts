@@ -43,6 +43,7 @@ interface GeoDomState {
 
   setPreferences:(next:ValueOrUpdater<RecommendationRequest>)=>void
   setFilter:<K extends keyof CatalogFilters>(key:K,value:CatalogFilters[K])=>void
+  replaceFilters:(filters:CatalogFilters)=>void
   resetFilters:()=>void
   resetPreferences:()=>void
   setFiltersOpen:(open:boolean)=>void
@@ -77,6 +78,11 @@ export const useGeoDomStore = create<GeoDomState>((set,get) => ({
 
   setFilter(key,value) {
     const filters = { ...get().filters,[key]:value }
+    saveCatalogFilters(filters)
+    set({ filters })
+  },
+
+  replaceFilters(filters) {
     saveCatalogFilters(filters)
     set({ filters })
   },
