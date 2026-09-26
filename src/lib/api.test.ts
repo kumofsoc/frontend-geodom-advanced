@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { api } from './api'
+import { readDemoEvents } from './recommendations'
 
 beforeEach(() => { localStorage.clear(); sessionStorage.clear() })
 describe('demo listing lifecycle', () => {
@@ -22,5 +23,13 @@ describe('demo listing lifecycle', () => {
     await api.register('first_user','password123')
     await expect(api.register('FIRST_USER','password456')).rejects.toThrow('занят')
     await expect(api.login('first_user','wrongpass')).rejects.toThrow('Неверный')
+  })
+})
+
+describe('recommendation integration', () => {
+  it('returns a request id and records a correlated event', async () => {
+    const response = await api.recommend({ budget_max:9000000, down_payment:0, family:{ adults:1, children:0 }, work_location:null, max_commute_minutes:40, priorities:{ schools:3,parks:3,transport:3,ecology:3,safety:3 }, limit:10 })
+    await api.event({ request_id:response.request_id,event:'click',entity_type:'apartment',entity_id:response.items[0].apartment_id,position:1 })
+    expect(readDemoEvents()[0]).toMatchObject({ request_id:response.request_id,event:'click',position:1 })
   })
 })

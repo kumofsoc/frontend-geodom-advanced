@@ -1,11 +1,12 @@
 import { demoApartments } from '../data/demo'
-import type { Apartment, ListingInput, User } from '../types'
+import { demoRecommend, logDemoEvent, normalizeRecommendation, rememberRecommendation } from './recommendations'
+import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 export const isDemo = !base
-const homesKey = 'sreda-demo-apartments-v1'
-const usersKey = 'sreda-demo-users-v1'
-const sessionKey = 'sreda-session-v1'
+const homesKey = 'geodom-demo-apartments-v1'
+const usersKey = 'geodom-demo-users-v1'
+const sessionKey = 'geodom-session-v1'
 const delay = () => new Promise(resolve => setTimeout(resolve, 180))
 function read<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(key) || '') as T } catch { return fallback } }
 function save(key: string, value: unknown) { localStorage.setItem(key, JSON.stringify(value)) }
@@ -21,7 +22,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     try { const body = await response.json(); message = typeof body.detail === 'string' ? body.detail : body.message || message } catch { /* no JSON error */ }
     throw new Error(message)
   }
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>
+  if (response.status === 204 || response.headers.get('content-length') === '0') return undefined as T
+  const raw = await response.text()
+  return raw ? JSON.parse(raw) as T : undefined as T
 }
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
 async function hash(value: string): Promise<string> {
@@ -40,6 +43,15 @@ async function imageData(file: File): Promise<string> {
 }
 export const api = {
   session: getSession,
+  async recommend(input: RecommendationRequest): Promise<RecommendationResponse> {
+    const response = isDemo ? (await delay(), demoRecommend(input)) : normalizeRecommendation(await request<RecommendationResponse>('/api/v1/recommendations', { method:'POST', body:JSON.stringify(input) }),base)
+    rememberRecommendation(response)
+    return response
+  },
+  async event(payload: InteractionPayload): Promise<void> {
+    if (isDemo) { logDemoEvent(payload); return }
+    await request<void>('/api/v1/events', { method:'POST', body:JSON.stringify(payload) })
+  },
   async list(): Promise<Apartment[]> { if (isDemo) { await delay(); return demoHomes().filter(x => x.status === 'published') } return request<Apartment[]>('/api/apartments') },
   async detail(id: string): Promise<Apartment> { if (isDemo) { await delay(); const item = demoHomes().find(x => x.id === id && x.status !== 'deleted'); if (!item) throw new Error('Объявление не найдено'); return item } return request<Apartment>(`/api/apartments/${encodeURIComponent(id)}`) },
   async mine(): Promise<Apartment[]> { if (isDemo) { await delay(); return demoHomes().filter(x => x.owner_id === getSession()?.user.id && x.status !== 'deleted') } return request<Apartment[]>('/api/users/me/apartments') },

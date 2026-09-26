@@ -16,3 +16,36 @@ export interface ListingInput { title: string; address: string; price: number; a
 export interface User { id: string; login: string }
 export type CatalogSort = 'recommended' | 'price_asc' | 'price_desc' | 'area_desc'
 export interface CatalogFilters { district: string; maxPrice: number; rooms: number; query: string; sort: CatalogSort }
+
+export interface RecommendationRequest {
+  budget_max: number
+  down_payment: number
+  family: { adults: number; children: number }
+  work_location: { lat: number; lon: number } | null
+  max_commute_minutes: number
+  priorities: { schools: number; parks: number; transport: number; ecology: number; safety: number }
+  limit: number
+}
+export interface RecommendationItem {
+  apartment_id: string | number
+  title: string
+  price: number
+  price_m2: number
+  predicted_price_m2: number | null
+  score: number
+  scores: { schools: number | null; parks: number | null; transport: number | null; ecology: number | null; safety: number | null; commute: number | null; price: number | null }
+  commute_minutes: number | null
+  reasons: string[]
+  warnings: string[]
+  cover_image_url: string | null
+}
+export interface RecommendationResponse {
+  request_id: string
+  model_version: string
+  scoring_version: string
+  ml_available: boolean
+  warnings: string[]
+  items: RecommendationItem[]
+}
+export type InteractionEvent = 'impression' | 'click' | 'save' | 'compare' | 'report'
+export interface InteractionPayload { request_id: string; event: InteractionEvent; entity_type: 'apartment'; entity_id: string | number; position: number }
