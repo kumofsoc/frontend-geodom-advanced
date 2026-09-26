@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoRecommend, getLastRecommendationItem, getSavedIds, logDemoEvent, normalizeRecommendation, readDemoEvents, rememberRecommendation, toggleSavedId } from './recommendations'
+import { demoRecommend, getLastRecommendationItem, getSavedIds, loadLastRecommendation, logDemoEvent, normalizeRecommendation, readDemoEvents, rememberRecommendation, toggleSavedId } from './recommendations'
 import type { RecommendationRequest } from '../types'
 
 const request: RecommendationRequest = {
@@ -40,6 +40,7 @@ describe('demo recommendation gateway', () => {
     expect(match?.response.request_id).toBe(response.request_id)
     expect(match?.item.score).toBe(response.items.find(x => x.apartment_id === 'a1')?.score)
     expect(getLastRecommendationItem('missing')).toBeNull()
+    expect(loadLastRecommendation()?.request_id).toBe(response.request_id)
   })
   it('accepts the minimal backend DTO and resolves relative photo URLs', () => {
     const raw = { request_id:'req-backend', model_version:'catboost-v1', scoring_version:'weighted-v1', items:[{ apartment_id:123,title:'Квартира',price:8900000,price_m2:159000,score:8.7,scores:{schools:8.9,parks:8.4,transport:9.1},reasons:['Школа рядом'],cover_image_url:'/media/cover.webp' }] }
@@ -48,6 +49,14 @@ describe('demo recommendation gateway', () => {
     expect(result.items[0].scores.ecology).toBeNull()
     expect(result.items[0].warnings).toEqual([])
     expect(result.warnings).toEqual([])
+  })
+  it('converts NaN and blank backend values into explicit missing values', () => {
+    const result = normalizeRecommendation({ request_id:'req-nan', model_version:'m', scoring_version:'s', items:[{ apartment_id:1,title:' ',price:Number.NaN,score:Number.NaN,scores:{schools:Number.NaN},predicted_price_m2:Number.NaN,reasons:['', 'nan'] }] },'')
+    expect(result.items[0].title).toBe('Объект без названия')
+    expect(result.items[0].price).toBe(0)
+    expect(result.items[0].predicted_price_m2).toBeNull()
+    expect(result.items[0].scores.schools).toBeNull()
+    expect(result.items[0].reasons).toEqual([])
   })
 })
 
