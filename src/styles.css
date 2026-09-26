@@ -225,3 +225,10 @@
 .mortgage-note{display:flex;align-items:flex-start;gap:7px;margin:10px 0 0;padding-top:10px;border-top:1px solid #e8eef4;color:#8195a8;font-size:7.5px;line-height:1.45}.mortgage-note svg{flex:none;color:#4e82b4}
 @media(max-width:900px){.mortgage-calculator{margin-top:0}}
 @media(max-width:460px){.mortgage-result{grid-template-columns:1fr}}
+
+
+/* Original listing source actions */
+.card-source-link{display:flex;align-items:center;justify-content:center;gap:5px;margin:0 14px 13px;padding:8px 9px;border:1px solid #e1e9f1;border-radius:7px;background:#f8fbfe;color:#6b8196;font-size:8px;font-weight:800}
+.card-source-link:hover{border-color:#b9d5f1;background:#eef6ff;color:#1e71cf}
+.compare-source-link{display:inline-flex;align-items:center;gap:4px;color:#1e73d1;font-weight:800}
+.compare-source-link:hover{text-decoration:underline}
