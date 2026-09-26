@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach,describe,expect,it } from 'vitest'
 import { buildSharedDemandProfile,loadSharedDemandProfile,revokeSharedDemandProfile,saveSharedDemandProfile,sharedDemandProfileToLead } from './demandProfile'
 import { defaultCatalogFilters,defaultPreferences } from './preferences'
