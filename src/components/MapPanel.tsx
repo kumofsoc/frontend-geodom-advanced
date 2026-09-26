@@ -133,10 +133,33 @@ export function MapPanel({
     return counts
   },[geoObjects])
 
-  const validApartmentCount = useMemo(
-    () => items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude)).length,
+  const validApartments = useMemo(
+    () => items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude)),
     [items]
   )
+  const validApartmentCount = validApartments.length
+  const apartmentMode:'hidden'|'cluster'|'prices' = zoom <= CITY_OVERVIEW_MAX_ZOOM
+    ? 'hidden'
+    : zoom < APARTMENT_CLUSTER_MIN_ZOOM
+      ? 'hidden'
+      : zoom < APARTMENT_PRICE_MIN_ZOOM
+        ? 'cluster'
+        : 'prices'
+  const visibleApartments = useMemo(
+    () => validApartments.filter(item => {
+      const point = validCoordinate(item.latitude,item.longitude)
+      return !!point && withinViewport(point.lat,point.lon,viewport)
+    }),
+    [validApartments,viewport]
+  )
+  const useApartmentClusters = apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
+  const eligiblePoi = useMemo(
+    () => zoom >= POI_MIN_ZOOM
+      ? geoObjects.filter(item => withinViewport(item.lat,item.lon,viewport))
+      : [],
+    [geoObjects,zoom,viewport]
+  )
+  const visiblePoi = useMemo(() => eligiblePoi.slice(0,MAX_POI_MARKS),[eligiblePoi])
 
   useEffect(() => {
     let cancelled = false
@@ -198,22 +221,10 @@ export function MapPanel({
     if (!ready || !instance || !ymaps) return
 
     instance.geoObjects.removeAll()
-    const valid = items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude))
+    const valid = validApartments
     const groups = new Map<string,Apartment[]>()
     for (const item of valid) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
     const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
-    const apartmentMode = zoom <= CITY_OVERVIEW_MAX_ZOOM
-      ? 'hidden'
-      : zoom < APARTMENT_CLUSTER_MIN_ZOOM
-        ? 'hidden'
-        : zoom < APARTMENT_PRICE_MIN_ZOOM
-          ? 'cluster'
-          : 'prices'
-    const visibleApartments = valid.filter(item => {
-      const point = validCoordinate(item.latitude,item.longitude)
-      return !!point && withinViewport(point.lat,point.lon,viewport)
-    })
-    const useApartmentClusters = apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
     const apartmentRenderSet = apartmentMode === 'hidden' ? [] : visibleApartments
 
     if (signature && signature !== fittedSignature.current && !workPicking) {
@@ -374,10 +385,6 @@ export function MapPanel({
     }
 
     const poiMarks:any[] = []
-    const eligiblePoi = zoom >= POI_MIN_ZOOM
-      ? geoObjects.filter(item => withinViewport(item.lat,item.lon,viewport))
-      : []
-    const visiblePoi = eligiblePoi.slice(0,MAX_POI_MARKS)
     for (const item of visiblePoi) {
       const layer = classifyGeoObject(item)
       if (!layer || !layers[layer]) continue
@@ -433,7 +440,7 @@ export function MapPanel({
         instance.geoObjects.add(workPlacemark)
       }
     }
-  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,viewport,activeApartmentIds,scoreByApartment,layers])
+  },[validApartments,visibleApartments,visiblePoi,selectedDistrict,workLocation,workPicking,ready,zoom,viewport,activeApartmentIds,scoreByApartment,layers,apartmentMode,useApartmentClusters])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
@@ -466,7 +473,7 @@ export function MapPanel({
           <small>{layerCounts[layer.key]}</small>
         </button>)}
         {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
-        {eligiblePoi.length > MAX_POI_MARKS && <div className="map-data-warning">POI слишком много: показываем ближайшие {MAX_POI_MARKS} объектов в окне</div>}
+        {eligiblePoi.length > MAX_POI_MARKS && <div className="map-data-warning">POI слишком много: показываем {MAX_POI_MARKS} из {eligiblePoi.length} объектов текущего окна</div>}
       </>}
     </div>
 
