@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { RecommendationResults } from './RecommendationResults'
 import { getSavedIds, readDemoEvents } from '../lib/recommendations'
+import { useGeoDomStore } from '../store/useGeoDomStore'
 import type { RecommendationResponse } from '../types'
 const result: RecommendationResponse = {
   request_id:'req-ui-test', model_version:'demo-no-model', scoring_version:'demo-weighted-v1', ml_available:false,
@@ -12,7 +13,7 @@ const result: RecommendationResponse = {
     scores:{schools:9,parks:8,transport:7,ecology:null,safety:null,commute:null,price:8}, commute_minutes:null,
     reasons:['Школа рядом','Парк рядом'], warnings:[],cover_image_url:null }]
 }
-beforeEach(() => localStorage.clear())
+beforeEach(() => { localStorage.clear(); useGeoDomStore.setState({ savedIds:[],comparedIds:[] }) })
 it('shows warnings and records an impression, save and compare with request context', async () => {
   render(<MemoryRouter><RecommendationResults response={result} loading={false} error="" onRetry={() => {}}/></MemoryRouter>)
   expect(screen.getByText('Нет данных об экологии')).toBeTruthy()

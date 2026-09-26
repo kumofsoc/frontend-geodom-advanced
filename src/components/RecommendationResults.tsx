@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, GitCompareArrows, Sparkles, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { ArrowRight, ArrowUpRight, Bookmark, Check, CircleAlert, FileText, GitCompareArrows, Sparkles, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import { getSavedIds, toggleSavedId } from '../lib/recommendations'
+import { useGeoDomStore } from '../store/useGeoDomStore'
 import { price } from '../lib/catalog'
 import type { InteractionEvent, RecommendationItem, RecommendationResponse } from '../types'
 
@@ -25,10 +25,17 @@ function scoreContributions(item: RecommendationItem) {
     .sort((a,b) => b[1]-a[1])
 }
 export function RecommendationResults({ response, loading, error, onRetry }:{ response:RecommendationResponse|null; loading:boolean; error:string; onRetry:()=>void }) {
-  const [saved,setSaved] = useState<string[]>(getSavedIds)
-  const [compared,setCompared] = useState<string[]>([])
+  const saved = useGeoDomStore(state => state.savedIds)
+  const compared = useGeoDomStore(state => state.comparedIds)
+  const toggleSaved = useGeoDomStore(state => state.toggleSaved)
+  const toggleCompared = useGeoDomStore(state => state.toggleCompared)
+  const pruneCompared = useGeoDomStore(state => state.pruneCompared)
+  const clearCompared = useGeoDomStore(state => state.clearCompared)
   const sent = useRef(new Set<string>())
-  useEffect(() => { setCompared([]) },[response?.request_id])
+  useEffect(() => {
+    if (!response) return
+    pruneCompared(response.items.map(item => String(item.apartment_id)))
+  },[response?.request_id,pruneCompared])
   function track(event:InteractionEvent,item:RecommendationItem,position:number) {
     if (!response) return
     const key = `${response.request_id}:${event}:${item.apartment_id}`
@@ -36,14 +43,19 @@ export function RecommendationResults({ response, loading, error, onRetry }:{ re
     sent.current.add(key)
     void api.event({ request_id:response.request_id,event,entity_type:'apartment',entity_id:item.apartment_id,position }).catch(() => {})
   }
-  function save(item:RecommendationItem,position:number) { const active = toggleSavedId(String(item.apartment_id)); setSaved(getSavedIds()); if (active) track('save',item,position) }
-  function compare(item:RecommendationItem,position:number) { const id=String(item.apartment_id); if (compared.includes(id)) { setCompared(prev => prev.filter(x => x !== id)); return } if (compared.length >= 3) return; setCompared(prev => [...prev,id]); track('compare',item,position) }
-  return <section className="recommendations-section" id="recommendations"><div className="dashboard-section-title recommendation-title"><div><h2>Подбор <span>для вас</span></h2><p>Результаты учитывают бюджет, семью и выбранные приоритеты</p></div>{response && <span className="mini-label">{response.items.length} ВАРИАНТОВ · {response.scoring_version}</span>}</div>
+  function save(item:RecommendationItem,position:number) { const active = toggleSaved(String(item.apartment_id)); if (active) track('save',item,position) }
+  function compare(item:RecommendationItem,position:number) {
+    const id=String(item.apartment_id)
+    const wasCompared=compared.includes(id)
+    const active=toggleCompared(id)
+    if (!wasCompared && active) track('compare',item,position)
+  }
+  return <section className="recommendations-section" id="recommendations"><div className="dashboard-section-title recommendation-title"><div><h2>Подбор <span>для вас</span></h2><p>Результаты учитывают бюджет, семью и выбранные приоритеты</p></div>{response && <div className="recommendation-head-actions"><span className="mini-label">{response.items.length} ВАРИАНТОВ · {response.scoring_version}</span><Link className="report-link" to="/report"><FileText size={15}/> Отчёт</Link></div>}</div>
     {loading ? <div className="recommendation-loading"><span className="spinner"/> Подбираем варианты под ваши параметры…</div> : error ? <div className="recommendation-error"><CircleAlert size={20}/><div><b>Не удалось получить рекомендации</b><p>{error}. Общий каталог ниже доступен.</p></div><button onClick={onRetry}>Повторить</button></div> : response && <>
       {response.warnings.length > 0 && <div className="recommendation-warning"><CircleAlert size={19}/><div>{response.warnings.map(w => <p key={w}>{w}</p>)}</div></div>}
       {response.items.length ? <div className="recommendation-grid">{response.items.map((item,index) => <RecommendationCard key={String(item.apartment_id)} item={item} position={index+1} saved={saved.includes(String(item.apartment_id))} compared={compared.includes(String(item.apartment_id))} compareFull={compared.length >= 3} onImpression={() => track('impression',item,index+1)} onOpen={() => track('click',item,index+1)} onSave={() => save(item,index+1)} onCompare={() => compare(item,index+1)}/>)}</div> : <div className="recommendation-empty"><h3>В этом бюджете вариантов нет</h3><p>Увеличьте максимальную стоимость или посмотрите общий каталог ниже.</p></div>}
       <div className="recommendation-meta"><Sparkles size={15}/> {response.ml_available ? `Модель: ${response.model_version}` : 'Демонстрационный скоринг без ML'} · Запрос {response.request_id.slice(0,8)}</div>
-      {compared.length > 0 && <CompareTray items={compared.map(id => response.items.find(item => String(item.apartment_id) === id)).filter((item):item is RecommendationItem => !!item)} onOpen={item => track('click',item,response.items.findIndex(candidate => candidate.apartment_id === item.apartment_id)+1)} onRemove={id => setCompared(prev => prev.filter(x => x !== id))} onClose={() => setCompared([])}/>}
+      {compared.length > 0 && <CompareTray items={compared.map(id => response.items.find(item => String(item.apartment_id) === id)).filter((item):item is RecommendationItem => !!item)} onOpen={item => track('click',item,response.items.findIndex(candidate => candidate.apartment_id === item.apartment_id)+1)} onRemove={id => toggleCompared(id)} onClose={clearCompared}/>}
     </>}
   </section>
 }
