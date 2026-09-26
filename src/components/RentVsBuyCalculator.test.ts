@@ -38,7 +38,8 @@ describe('rent vs buy model',() => {
       purchaseCostsPercent:0,
       saleCostsPercent:0
     })
-    expect(result.buyerNetWorth).toBe(6_000_000)
+    // The owner has no mortgage/maintenance in this scenario and invests the 30k monthly cost advantage.
+    expect(result.buyerNetWorth).toBe(7_800_000)
     expect(result.totalRentPaid).toBe(1_800_000)
   })
 })
