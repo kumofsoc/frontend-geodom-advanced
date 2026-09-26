@@ -40,16 +40,6 @@ export function Report() {
   },[response?.request_id])
 
   function printReport() {
-    const first = top[0]
-    if (response && first) {
-      void api.event({
-        request_id:response.request_id,
-        event:'report',
-        entity_type:'apartment',
-        entity_id:first.apartment_id,
-        position:1
-      }).catch(() => {})
-    }
     window.print()
   }
 
