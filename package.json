@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "size:check": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
