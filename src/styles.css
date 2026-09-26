@@ -402,3 +402,168 @@
 .mortgage-bank-directory:not([open]) .mortgage-bank-list{display:none}
 @media(max-width:1100px){.mortgage-summary-card{width:100%}.mortgage-summary-head .mortgage-summary-program b{max-width:none}}
 @media(max-width:460px){.mortgage-summary-payment>strong{font-size:25px}.mortgage-summary-card .mortgage-summary-grid{grid-template-columns:1fr}.mortgage-summary-card .mortgage-summary-grid>div{border-right:0!important;border-bottom:1px solid #edf1f4}.mortgage-summary-card .mortgage-summary-grid>div:last-child{border-bottom:0}}
+
+
+/* Mortgage responsive layout hotfix
+   The calculator lives inside Detail, so viewport media queries were not enough:
+   at wide viewport the finance section still gave it only ~50% of the content width.
+   Make the finance tools stack and make the calculator respond to its own width. */
+.finance-tools{
+  grid-template-columns:minmax(0,1fr)!important;
+  width:100%;
+  min-width:0;
+}
+.finance-tools>*,
+.mortgage-calculator-v2,
+.mortgage-v2-layout,
+.mortgage-v2-controls,
+.mortgage-control-card,
+.mortgage-summary-card,
+.rent-buy-calculator{
+  min-width:0;
+  max-width:100%;
+}
+.mortgage-calculator-v2{
+  width:100%;
+  overflow:hidden;
+  container-type:inline-size;
+  container-name:mortgage;
+}
+.mortgage-v2-layout{
+  grid-template-columns:minmax(0,1fr) minmax(250px,320px);
+  width:100%;
+}
+.mortgage-v2-layout>*{min-width:0}
+.mortgage-v2-controls{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  width:100%;
+}
+.mortgage-control-card{
+  overflow:hidden;
+}
+.mortgage-program-grid{
+  grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+  width:100%;
+}
+.mortgage-program-card{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+}
+.mortgage-program-copy{
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+}
+.mortgage-program-copy b,
+.mortgage-program-copy small{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.mortgage-select-wrap,
+.mortgage-v2-select{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+}
+.mortgage-select-wrap select,
+.mortgage-v2-select select{
+  display:block;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  overflow:hidden;
+  appearance:none;
+}
+.mortgage-select-wrap svg{
+  z-index:2;
+}
+.mortgage-control-title{
+  min-width:0;
+}
+.mortgage-control-title>span,
+.mortgage-control-title>b{
+  min-width:0;
+}
+.mortgage-control-title>b{
+  text-align:right;
+  overflow-wrap:anywhere;
+}
+.mortgage-summary-card{
+  z-index:auto!important;
+  isolation:isolate;
+}
+.rent-buy-calculator{
+  width:100%;
+  overflow:hidden;
+}
+
+/* Component-width breakpoints: these fire from the actual calculator width,
+   not the browser viewport, so embedding it in narrow parents stays safe. */
+@container mortgage (max-width: 860px){
+  .mortgage-v2-layout{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .mortgage-summary-card{
+    width:100%;
+  }
+}
+@container mortgage (max-width: 640px){
+  .mortgage-calculator-v2{
+    padding:16px;
+    border-radius:16px;
+  }
+  .mortgage-v2-head{
+    flex-direction:column;
+  }
+  .mortgage-v2-controls{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .mortgage-program-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .mortgage-family-settings{
+    grid-column:auto;
+    grid-template-columns:minmax(0,1fr);
+  }
+  .mortgage-program-note,
+  .mortgage-fit-warning{
+    grid-column:auto;
+  }
+  .mortgage-fit-warning{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+}
+@container mortgage (max-width: 420px){
+  .mortgage-program-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .mortgage-program-card{
+    min-height:50px;
+  }
+  .mortgage-v2-head h3{
+    font-size:20px;
+  }
+  .mortgage-summary-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .mortgage-summary-card .mortgage-summary-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .mortgage-summary-card .mortgage-summary-grid>div{
+    border-right:0!important;
+    border-bottom:1px solid #edf1f4;
+  }
+  .mortgage-summary-card .mortgage-summary-grid>div:last-child{
+    border-bottom:0;
+  }
+}
