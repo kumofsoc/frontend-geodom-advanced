@@ -221,7 +221,7 @@ export function MapPanel({
       const active = selectedDistrict === district
       const html = compactDistricts
         ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
-        : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span>${average === null ? '' : `<b>${average.toFixed(1)}</b>`}</div>`
+        : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span><div>${average === null ? '<b>—</b>' : `<b>${average.toFixed(1)}</b>`}<em>/10</em></div><small>${houses.length} ${houses.length === 1 ? 'квартира' : houses.length < 5 ? 'квартиры' : 'квартир'}</small></div>`
 
       const layout = ymaps.templateLayoutFactory.createClass(html)
       const placemark = new ymaps.Placemark(
