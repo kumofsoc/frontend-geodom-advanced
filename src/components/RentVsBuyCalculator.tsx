@@ -1,8 +1,11 @@
-import { useMemo,useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { ArrowRightLeft, Home, Landmark, TrendingUp } from 'lucide-react'
 import { price } from '../lib/catalog'
 import { calculateMortgage } from './MortgageCalculator'
 import { KRASNOYARSK_MORTGAGE_BANKS,mortgageOfferEligibility } from '../lib/mortgageBanks'
+import { api,isDemo } from '../lib/api'
+import { AssumptionsDrawer,DataFreshness,SourceBadge,WarningBanner } from './DataTrust'
+import type { RentVsBuyBackendResponse } from '../types'
 
 export type RentVsBuyInput = {
   apartmentPrice:number
@@ -43,12 +46,13 @@ function mortgageBalance(principal:number,annualRate:number,totalMonths:number,p
   return Math.max(0,principal*growth-payment*(growth-1)/rate)
 }
 
+// Pure demo/reference model retained for tests and the explicit demo adapter.
+// Live UI never calls this function directly.
 export function calculateRentVsBuy(input:RentVsBuyInput):RentVsBuyResult {
   const horizonMonths=Math.max(1,Math.round(input.years*12))
   const mortgageYears=Math.max(1,input.mortgageYears)
   const mortgage=calculateMortgage(input.apartmentPrice,input.downPayment,input.annualRate,mortgageYears)
   const mortgageMonths=Math.round(mortgageYears*12)
-
   const homeGrowth=monthlyRate(input.homeGrowthPercent)
   const rentGrowth=monthlyRate(input.rentGrowthPercent)
   const investmentGrowth=monthlyRate(input.investmentReturnPercent)
@@ -63,13 +67,10 @@ export function calculateRentVsBuy(input:RentVsBuyInput):RentVsBuyResult {
     rent*=1+rentGrowth
     renterPortfolio*=1+investmentGrowth
     buyerPortfolio*=1+investmentGrowth
-
     const maintenance=homeValue*(input.maintenancePercent/100)/12
     const buyerHousingCost=(month <= mortgageMonths ? mortgage.monthlyPayment : 0)+maintenance
-    const renterHousingCost=rent
     totalRentPaid+=rent
-
-    const difference=buyerHousingCost-renterHousingCost
+    const difference=buyerHousingCost-rent
     if (difference > 0) renterPortfolio+=difference
     else buyerPortfolio+=-difference
   }
@@ -77,12 +78,10 @@ export function calculateRentVsBuy(input:RentVsBuyInput):RentVsBuyResult {
   const remainingMortgage=mortgageBalance(mortgage.principal,input.annualRate,mortgageMonths,Math.min(horizonMonths,mortgageMonths),mortgage.monthlyPayment)
   const saleCosts=homeValue*(input.saleCostsPercent/100)
   const buyerNetWorth=Math.max(0,homeValue-remainingMortgage-saleCosts)+buyerPortfolio
-  const renterNetWorth=renterPortfolio
-
   return {
     buyerNetWorth,
-    renterNetWorth,
-    difference:buyerNetWorth-renterNetWorth,
+    renterNetWorth:renterPortfolio,
+    difference:buyerNetWorth-renterPortfolio,
     futureHomeValue:homeValue,
     remainingMortgage,
     renterPortfolio,
@@ -92,13 +91,7 @@ export function calculateRentVsBuy(input:RentVsBuyInput):RentVsBuyResult {
   }
 }
 
-export function RentVsBuyCalculator({
-  apartmentPrice,
-  defaultDownPayment=0
-}:{
-  apartmentPrice:number
-  defaultDownPayment?:number
-}) {
+export function RentVsBuyCalculator({apartmentPrice,defaultDownPayment=0}:{apartmentPrice:number;defaultDownPayment?:number}) {
   const [bankId,setBankId]=useState('sber')
   const [downPayment,setDownPayment]=useState(Math.min(apartmentPrice,defaultDownPayment > 0 ? defaultDownPayment : Math.round(apartmentPrice*.2)))
   const [years,setYears]=useState(10)
@@ -108,30 +101,65 @@ export function RentVsBuyCalculator({
   const [homeGrowth,setHomeGrowth]=useState(4)
   const [maintenance,setMaintenance]=useState(1)
   const [investmentReturn,setInvestmentReturn]=useState(8)
-  const [advanced,setAdvanced]=useState(false)
+  const [mode,setMode]=useState<'monthly'|'total'>('monthly')
+  const [result,setResult]=useState<RentVsBuyBackendResponse|null>(null)
+  const [loading,setLoading]=useState(false)
+  const [error,setError]=useState('')
 
   const bank=KRASNOYARSK_MORTGAGE_BANKS.find(item => item.id === bankId) ?? KRASNOYARSK_MORTGAGE_BANKS[0]
   const eligibility=mortgageOfferEligibility(bank,apartmentPrice,downPayment,mortgageYears)
   const annualRate=bank.rateFrom
-  const result=useMemo(() => annualRate === null ? null : calculateRentVsBuy({
-    apartmentPrice,
-    downPayment,
-    annualRate,
-    years,
-    mortgageYears,
-    monthlyRent,
-    rentGrowthPercent:rentGrowth,
-    homeGrowthPercent:homeGrowth,
-    maintenancePercent:maintenance,
-    investmentReturnPercent:investmentReturn,
-    purchaseCostsPercent:1,
-    saleCostsPercent:2
-  }),[apartmentPrice,downPayment,annualRate,years,mortgageYears,monthlyRent,rentGrowth,homeGrowth,maintenance,investmentReturn])
+
+  const requestBody=useMemo(() => annualRate === null ? null : ({
+    apartment_price:apartmentPrice,
+    down_payment:downPayment,
+    annual_rate:annualRate,
+    mortgage_years:mortgageYears,
+    horizon_years:years,
+    monthly_rent:monthlyRent,
+    rent_growth_percent:rentGrowth,
+    home_growth_percent:homeGrowth,
+    maintenance_percent:maintenance,
+    investment_return_percent:investmentReturn,
+    purchase_costs_percent:1,
+    sale_costs_percent:2
+  }),[apartmentPrice,downPayment,annualRate,mortgageYears,years,monthlyRent,rentGrowth,homeGrowth,maintenance,investmentReturn])
+
+  useEffect(() => {
+    if (!requestBody) {
+      setResult(null)
+      setError('У выбранного банка нет ставки для расчёта.')
+      return
+    }
+    const controller=new AbortController()
+    const timer=window.setTimeout(() => {
+      setLoading(true)
+      setError('')
+      api.rentVsBuy(requestBody,controller.signal)
+        .then(value => { if (!controller.signal.aborted) setResult(value) })
+        .catch(err => {
+          if (controller.signal.aborted) return
+          setResult(null)
+          setError(err instanceof Error ? err.message : 'Расчёт временно недоступен')
+        })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    },220)
+    return () => { window.clearTimeout(timer);controller.abort() }
+  },[requestBody])
+
+  const statement=result?.break_even_year == null
+    ? 'При выбранных допущениях точка, где покупка становится дешевле аренды, на заданном горизонте не найдена.'
+    : `При выбранных допущениях покупка становится дешевле аренды примерно после ${result.break_even_year} лет.`
 
   return <section className="rent-buy-calculator">
     <div className="rent-buy-head">
       <span><ArrowRightLeft size={17}/></span>
       <div><small>КУПИТЬ ИЛИ СНИМАТЬ</small><h3>Сценарий на {years} лет</h3></div>
+    </div>
+
+    <div className="rent-buy-tabs" role="tablist">
+      <button type="button" className={mode === 'monthly' ? 'active' : ''} onClick={() => setMode('monthly')}>Ежемесячный платёж</button>
+      <button type="button" className={mode === 'total' ? 'active' : ''} onClick={() => setMode('total')}>Общая стоимость</button>
     </div>
 
     <div className="rent-buy-core-fields">
@@ -142,35 +170,34 @@ export function RentVsBuyCalculator({
       <label><span>Срок ипотеки</span><select value={mortgageYears} onChange={event => setMortgageYears(Number(event.target.value))}>{[5,10,15,20,25,30].map(value => <option value={value} key={value}>{value} лет</option>)}</select></label>
     </div>
 
-    <button type="button" className="rent-buy-advanced-toggle" onClick={() => setAdvanced(value => !value)}>{advanced ? 'Скрыть допущения' : 'Настроить допущения'}</button>
-    {advanced && <div className="rent-buy-assumptions">
-      <label><span>Рост аренды / год</span><input type="number" step=".5" value={rentGrowth} onChange={event => setRentGrowth(Number(event.target.value))}/><small>%</small></label>
-      <label><span>Рост цены жилья / год</span><input type="number" step=".5" value={homeGrowth} onChange={event => setHomeGrowth(Number(event.target.value))}/><small>%</small></label>
-      <label><span>Содержание жилья / год</span><input type="number" min="0" step=".25" value={maintenance} onChange={event => setMaintenance(Math.max(0,Number(event.target.value)))}/><small>% стоимости</small></label>
-      <label><span>Доходность свободных денег</span><input type="number" step=".5" value={investmentReturn} onChange={event => setInvestmentReturn(Number(event.target.value))}/><small>% / год</small></label>
-    </div>}
+    {!eligibility.eligible && <WarningBanner title="Условия выбранного банка" warnings={[...eligibility.reasons,'Расчёт сценария не означает одобрение кредита.']}/>}
+    {error && <WarningBanner title={isDemo ? 'Демо-расчёт недоступен' : 'Backend buy-vs-rent не ответил'} warnings={[error,...(!isDemo ? ['GeoDom не подменяет live-ошибку локальным mock-расчётом.'] : [])]}/>}
 
-    {!eligibility.eligible && <div className="rent-buy-warning">{bank.bank}: {eligibility.reasons.join(' · ')}. Сценарий ниже математический и не означает, что банк одобрит эти параметры.</div>}
+    {loading && <div className="rent-buy-loading"><span className="spinner"/> Пересчитываем сценарий…</div>}
 
     {result && <div className="rent-buy-result">
-      <div className="rent-buy-column buy">
-        <span><Home size={14}/> ПОКУПКА</span>
-        <strong>{price(Math.round(result.buyerNetWorth))}</strong>
-        <small>модельный капитал через {years} лет</small>
-        <p>Жильё: {price(Math.round(result.futureHomeValue))}<br/>Остаток кредита: {price(Math.round(result.remainingMortgage))}<br/>Платёж: {price(Math.round(result.monthlyMortgage))}/мес</p>
-      </div>
-      <div className="rent-buy-column rent">
-        <span><TrendingUp size={14}/> АРЕНДА + КАПИТАЛ</span>
-        <strong>{price(Math.round(result.renterNetWorth))}</strong>
-        <small>модельный инвестиционный капитал</small>
-        <p>Аренда за период: {price(Math.round(result.totalRentPaid))}<br/>Начальный капитал: взнос + 1% расходов покупки</p>
-      </div>
-      <div className={`rent-buy-difference ${result.difference >= 0 ? 'buy-ahead' : 'rent-ahead'}`}>
-        <span>Разница модели</span>
-        <b>{result.difference >= 0 ? 'Покупка +' : 'Аренда +'}{price(Math.abs(Math.round(result.difference)))}</b>
-      </div>
+      {mode === 'monthly' ? <>
+        <div className="rent-buy-column buy"><span><Home size={14}/> ИПОТЕКА</span><strong>{price(result.mortgage_monthly)}/мес</strong><small>по выбранной ставке и сроку</small></div>
+        <div className="rent-buy-column rent"><span><TrendingUp size={14}/> АРЕНДА</span><strong>{price(result.rent_monthly)}/мес</strong><small>стартовое значение аренды</small></div>
+      </> : <>
+        <div className="rent-buy-column buy"><span><Home size={14}/> ВЛАДЕНИЕ</span><strong>{price(result.ownership_total)}</strong><small>модельные расходы за {result.horizon_years} лет</small></div>
+        <div className="rent-buy-column rent"><span><TrendingUp size={14}/> АРЕНДА</span><strong>{price(result.rent_total)}</strong><small>модельные расходы за {result.horizon_years} лет</small></div>
+      </>}
+      <div className="rent-buy-break-even"><b>{statement}</b></div>
     </div>}
 
-    <p className="rent-buy-note"><Landmark size={14}/> Это сценарная модель, а не совет «покупать» или «снимать». Она чувствительна к росту цен, аренды, доходности свободных денег, страховке, налогам, ремонту и реальной ставке. Начальные допущения можно изменить выше.</p>
+    <AssumptionsDrawer>
+      <div className="rent-buy-assumptions">
+        <label><span>Рост аренды / год</span><input type="number" step=".5" value={rentGrowth} onChange={event => setRentGrowth(Number(event.target.value))}/><small>%</small></label>
+        <label><span>Рост цены жилья / год</span><input type="number" step=".5" value={homeGrowth} onChange={event => setHomeGrowth(Number(event.target.value))}/><small>%</small></label>
+        <label><span>Содержание жилья / год</span><input type="number" min="0" step=".25" value={maintenance} onChange={event => setMaintenance(Math.max(0,Number(event.target.value)))}/><small>% стоимости</small></label>
+        <label><span>Доходность свободных денег</span><input type="number" step=".5" value={investmentReturn} onChange={event => setInvestmentReturn(Number(event.target.value))}/><small>% / год</small></label>
+      </div>
+    </AssumptionsDrawer>
+
+    {result && <div className="rent-buy-provenance"><SourceBadge name={result.source_name}/><DataFreshness date={result.updated_at}/></div>}
+    {result?.warnings.length ? <WarningBanner warnings={result.warnings}/> : null}
+
+    <p className="rent-buy-note"><Landmark size={14}/> Это сценарный расчёт, а не совет «покупать» или «снимать». Результат зависит от указанных допущений.</p>
   </section>
 }
