@@ -19,6 +19,7 @@ export function PreferencePanel({
   error,
   filters,
   districts,
+  buildingTypes,
   onFilter,
   onReset,
   open,
@@ -33,6 +34,7 @@ export function PreferencePanel({
   error:string
   filters:CatalogFilters
   districts:string[]
+  buildingTypes:string[]
   onFilter:<K extends keyof CatalogFilters>(key:K,value:CatalogFilters[K])=>void
   onReset:()=>void
   open:boolean
@@ -81,7 +83,29 @@ export function PreferencePanel({
         <label className="sidebar-label" htmlFor="district">Район каталога</label>
         <select id="district" value={filters.district} onChange={e => onFilter('district',e.target.value)}><option value="">Все районы</option>{districts.map(d => <option key={d}>{d}</option>)}</select>
         <span className="sidebar-label inline">Комнат в каталоге</span>
-        <div className="room-options">{[[0,'Все'],[1,'1'],[2,'2'],[3,'3']].map(([n,label]) => <button type="button" key={n} className={filters.rooms === n ? 'selected' : ''} onClick={() => onFilter('rooms',Number(n))}>{label}</button>)}</div>
+        <div className="room-options">{[[0,'Все'],[1,'1'],[2,'2'],[3,'3'],[4,'4+']].map(([n,label]) => <button type="button" key={n} className={filters.rooms === n ? 'selected' : ''} onClick={() => onFilter('rooms',Number(n))}>{label}</button>)}</div>
+
+        <div className="catalog-extra-filters">
+          <label>
+            <span>Площадь от, м²</span>
+            <input type="number" min="0" step="1" value={filters.minArea || ''} onChange={e => onFilter('minArea',e.target.value === '' ? 0 : Number(e.target.value))}/>
+          </label>
+          <label>
+            <span>Год дома от</span>
+            <input type="number" min="1800" max="2100" step="1" value={filters.yearFrom || ''} onChange={e => onFilter('yearFrom',e.target.value === '' ? 0 : Number(e.target.value))}/>
+          </label>
+        </div>
+
+        <label className="sidebar-label inline" htmlFor="building-type">Тип дома</label>
+        <select id="building-type" value={filters.buildingType} onChange={e => onFilter('buildingType',e.target.value)}>
+          <option value="">Любой тип</option>
+          {buildingTypes.map(type => <option key={type} value={type}>{type}</option>)}
+        </select>
+
+        <label className="photo-filter-toggle">
+          <input type="checkbox" checked={filters.onlyWithPhotos} onChange={e => onFilter('onlyWithPhotos',e.target.checked)}/>
+          <span>Только квартиры с фотографиями</span>
+        </label>
       </div>
 
       <div className="sidebar-block priority-block">
