@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Building2, ChevronDown, CircleHelp, MapPin, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApartmentCard, EmptyState, PageLoading } from '../components/Ui'
@@ -42,6 +42,7 @@ export function Catalog() {
   const [recommendationLoading,setRecommendationLoading] = useState(() => !loadLastRecommendation())
   const [recommendationError,setRecommendationError] = useState('')
   const [validationError,setValidationError] = useState('')
+  const priorityRecalcReady = useRef(false)
 
   useEffect(() => {
     api.list().then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false))
@@ -63,6 +64,26 @@ export function Catalog() {
 
   useEffect(() => { savePreferences(preferences) },[preferences])
   useEffect(() => { saveCatalogFilters(filters) },[filters])
+  const prioritySignature = Object.values(preferences.priorities).join(':')
+  useEffect(() => {
+    if (!priorityRecalcReady.current) {
+      priorityRecalcReady.current = true
+      return
+    }
+    const timer = window.setTimeout(() => {
+      if (validatePreferences(preferences)) return
+      setRecommendationLoading(true)
+      setRecommendationError('')
+      api.recommend(preferences)
+        .then(setResponse)
+        .catch(e => {
+          const message = e instanceof Error ? e.message : 'Сервер рекомендаций недоступен'
+          setRecommendationError(message)
+        })
+        .finally(() => setRecommendationLoading(false))
+    },450)
+    return () => window.clearTimeout(timer)
+  },[prioritySignature])
 
   const districts = useMemo(() => [...new Set(items.map(x => x.district.name))].filter(x => x !== 'Уточняется').sort(),[items])
   const visible = useMemo(() => filterApartments(items,filters),[items,filters])
