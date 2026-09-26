@@ -196,7 +196,7 @@ export function MapPanel({
         {
           iconLayout:layout,
           iconShape:{ type:'Rectangle',coordinates:[[-52,-34],[52,0]] },
-          zIndex:500
+          zIndex:900
         }
       )
       instance.geoObjects.add(placemark)
@@ -227,7 +227,7 @@ export function MapPanel({
           iconShape:compactDistricts
             ? { type:'Circle',coordinates:[0,0],radius:11 }
             : { type:'Rectangle',coordinates:[[-62,-62],[62,0]] },
-          zIndex:1000
+          zIndex:760
         }
       )
       placemark.events.add('click', () => districtHandler.current(district))
@@ -296,7 +296,7 @@ export function MapPanel({
     {workPicking && <div className="work-pick-hint">Нажмите на карте в точке, где находится работа</div>}
 
     <div className="map-layer-panel" aria-label="Слои инфраструктуры">
-      <div className="map-layer-title"><b>Слои на карте</b><small>{geoObjects.length} объектов</small></div>
+      <div className="map-layer-title"><b>Слои на карте</b><small>{validApartmentCount} квартир · {geoObjects.length} POI</small></div>
       {layerMeta.map(layer => <button
         type="button"
         key={layer.key}
