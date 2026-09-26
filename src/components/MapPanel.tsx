@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { ChevronDown, Layers3 } from 'lucide-react'
-import type { Apartment } from '../types'
+import type { Apartment,DistrictAnalysis,FutureDevelopmentMapItem } from '../types'
 import { price } from '../lib/catalog'
 import { validCoordinate, type GeoObject } from '../lib/dataSanitizers'
 import { loadYandexMaps } from '../lib/yandexMaps'
 import { createSpatialIndex, type SpatialBounds } from '../lib/spatialIndex'
+import { geoApi } from '../api/geo'
 
 type WorkLocation = { lat:number; lon:number } | null
-type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
+type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily' | 'future'
 
 const CITY_OVERVIEW_MAX_ZOOM = 8
 const DISTRICT_CARD_MAX_ZOOM = 9
@@ -24,7 +25,8 @@ const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
   { key:'parks',label:'Парки и зелень',preset:'islands#greenIcon' },
   { key:'healthcare',label:'Медицина',preset:'islands#redIcon' },
   { key:'transport',label:'Транспорт',preset:'islands#violetIcon' },
-  { key:'daily',label:'Магазины и сервисы',preset:'islands#orangeIcon' }
+  { key:'daily',label:'Магазины и сервисы',preset:'islands#orangeIcon' },
+  { key:'future',label:'Будущая инфраструктура',preset:'islands#yellowIcon' }
 ]
 
 function escapeHtml(value:string) {
@@ -80,17 +82,16 @@ function removeOverlay(instance:any,overlayRef:MutableRefObject<any>) {
 
 export function MapPanel({
   items,
-  geoObjects,
   selectedDistrict,
   onDistrict,
   workLocation,
   workPicking,
   onWorkLocation,
   activeApartmentIds,
-  scoreByApartment
+  scoreByApartment,
+  districtAnalysis=[]
 }:{
   items:Apartment[]
-  geoObjects:GeoObject[]
   selectedDistrict:string
   onDistrict:(district:string)=>void
   workLocation:WorkLocation
@@ -98,6 +99,7 @@ export function MapPanel({
   onWorkLocation:(location:{ lat:number;lon:number })=>void
   activeApartmentIds?:Set<string>
   scoreByApartment?:Map<string,number>
+  districtAnalysis?:DistrictAnalysis[]
 }) {
   const element=useRef<HTMLDivElement>(null)
   const map=useRef<any>(null)
@@ -111,19 +113,25 @@ export function MapPanel({
   const apartmentOverlay=useRef<any>(null)
   const districtOverlay=useRef<any>(null)
   const poiOverlay=useRef<any>(null)
+  const futureOverlay=useRef<any>(null)
   const workOverlay=useRef<any>(null)
 
   const [ready,setReady]=useState(false)
   const [zoom,setZoom]=useState(11)
   const [viewport,setViewport]=useState<SpatialBounds|null>(null)
   const [loadError,setLoadError]=useState('')
+  const [geoObjects,setGeoObjects]=useState<GeoObject[]>([])
+  const [geoLoading,setGeoLoading]=useState(false)
+  const [geoError,setGeoError]=useState('')
+  const [futureDevelopments,setFutureDevelopments]=useState<FutureDevelopmentMapItem[]>([])
   const [layersOpen,setLayersOpen]=useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
   const [layers,setLayers]=useState<Record<PoiLayer,boolean>>({
     education:true,
     parks:true,
     healthcare:true,
     transport:true,
-    daily:false
+    daily:false,
+    future:true
   })
 
   districtHandler.current=onDistrict
@@ -131,13 +139,13 @@ export function MapPanel({
   pickingRef.current=workPicking
 
   const layerCounts=useMemo(() => {
-    const counts:Record<PoiLayer,number>={ education:0,parks:0,healthcare:0,transport:0,daily:0 }
+    const counts:Record<PoiLayer,number>={ education:0,parks:0,healthcare:0,transport:0,daily:0,future:futureDevelopments.length }
     for (const item of geoObjects) {
       const layer=classifyGeoObject(item)
       if (layer) counts[layer]+=1
     }
     return counts
-  },[geoObjects])
+  },[geoObjects,futureDevelopments])
 
   const validApartments=useMemo(
     () => items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude)),
@@ -149,11 +157,6 @@ export function MapPanel({
     () => createSpatialIndex(validApartments,item => validCoordinate(item.latitude,item.longitude),.015),
     [validApartments]
   )
-  const poiIndex=useMemo(
-    () => createSpatialIndex(geoObjects,item => ({ lat:item.lat,lon:item.lon }),.015),
-    [geoObjects]
-  )
-
   const apartmentMode:'hidden'|'cluster'|'prices'=zoom <= CITY_OVERVIEW_MAX_ZOOM
     ? 'hidden'
     : zoom < APARTMENT_CLUSTER_MIN_ZOOM
@@ -170,10 +173,7 @@ export function MapPanel({
   const pricePinBudget=compactPricePins ? MAX_COMPACT_PRICE_PINS : MAX_PRICE_PINS
   const useApartmentClusters=apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > pricePinBudget)
 
-  const eligiblePoi=useMemo(
-    () => zoom >= POI_MIN_ZOOM ? poiIndex.query(viewport,{ padding:.18 }) : [],
-    [poiIndex,zoom,viewport]
-  )
+  const eligiblePoi=zoom >= POI_MIN_ZOOM ? geoObjects : []
   const visiblePoi=useMemo(() => eligiblePoi.slice(0,MAX_POI_MARKS),[eligiblePoi])
 
   const districtGroups=useMemo(() => {
@@ -181,6 +181,47 @@ export function MapPanel({
     for (const item of validApartments) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
     return groups
   },[validApartments])
+
+  useEffect(() => {
+    if (!ready || zoom < POI_MIN_ZOOM || !viewport) {
+      setGeoObjects([])
+      setGeoError('')
+      return
+    }
+    const poiEnabled=layers.education || layers.parks || layers.healthcare || layers.transport || layers.daily
+    if (!poiEnabled) {
+      setGeoObjects([])
+      setGeoError('')
+      return
+    }
+
+    const controller=new AbortController()
+    const timer=window.setTimeout(() => {
+      setGeoLoading(true)
+      setGeoError('')
+      geoApi.viewport({...viewport,limit:MAX_POI_MARKS,signal:controller.signal})
+        .then(items => { if (!controller.signal.aborted) setGeoObjects(items) })
+        .catch(error => {
+          if (controller.signal.aborted) return
+          setGeoObjects([])
+          setGeoError(error instanceof Error ? error.message : 'Не удалось загрузить инфраструктуру')
+        })
+        .finally(() => { if (!controller.signal.aborted) setGeoLoading(false) })
+    },260)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  },[ready,zoom,viewport?.minLat,viewport?.maxLat,viewport?.minLon,viewport?.maxLon,layers.education,layers.parks,layers.healthcare,layers.transport,layers.daily])
+
+  useEffect(() => {
+    const controller=new AbortController()
+    geoApi.developments(controller.signal)
+      .then(items => { if (!controller.signal.aborted) setFutureDevelopments(items) })
+      .catch(() => { if (!controller.signal.aborted) setFutureDevelopments([]) })
+    return () => controller.abort()
+  },[])
 
   useEffect(() => {
     let cancelled=false
@@ -389,15 +430,12 @@ export function MapPanel({
 
         const lat=points.reduce((sum,point) => sum+point.lat,0)/points.length
         const lon=points.reduce((sum,point) => sum+point.lon,0)/points.length
-        const scores=houses.map(home => {
-          const personal=scoreByApartment?.get(String(home.id))
-          return typeof personal === 'number' && Number.isFinite(personal) ? personal : score10(home.recommendation.score)
-        }).filter((value):value is number => value !== null)
-        const average=scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
+        const analysis=districtAnalysis.find(item => item.name === district)
+        const average=analysis?.overallScore ?? null
         const active=selectedDistrict === district
         const html=compactDistricts
           ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
-          : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span><div>${average === null ? '<b>—</b>' : `<b>${average.toFixed(1)}</b>`}<em>/10</em></div><small>${houses.length} ${houses.length === 1 ? 'квартира' : houses.length < 5 ? 'квартиры' : 'квартир'}</small></div>`
+          : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span><div>${average === null ? '<b>Нет данных</b>' : `<b>${average.toFixed(1)}</b><em>/10</em>`}</div><small>${houses.length} ${houses.length === 1 ? 'квартира' : houses.length < 5 ? 'квартиры' : 'квартир'}</small></div>`
         const layout=ymaps.templateLayoutFactory.createClass(html)
         const placemark=new ymaps.Placemark([lat,lon],{ hintContent:escapeHtml(district) },{
           iconLayout:layout,
@@ -419,7 +457,7 @@ export function MapPanel({
 
     districtOverlay.current=collection
     instance.geoObjects.add(collection)
-  },[ready,zoom,validApartments,districtGroups,selectedDistrict,scoreByApartment])
+  },[ready,zoom,validApartments,districtGroups,selectedDistrict,districtAnalysis])
 
   useEffect(() => {
     const instance=map.current
@@ -472,6 +510,35 @@ export function MapPanel({
     const ymaps=ymapsRef.current
     if (!ready || !instance || !ymaps) return
 
+    removeOverlay(instance,futureOverlay)
+    if (!layers.future || zoom < 10 || !futureDevelopments.length) return
+
+    const marks=futureDevelopments.map(item => {
+      const source=safeHttpUrl(item.sourceUrl)
+      const body=[
+        item.description ? `<span>${escapeHtml(item.description)}</span>` : '',
+        item.plannedCompletionYear ? `<small>План: ${item.plannedCompletionYear}</small>` : '',
+        item.sourceName ? `<small>Источник: ${escapeHtml(item.sourceName)}</small>` : '',
+        source ? `<a href="${escapeHtml(source)}" target="_blank" rel="noreferrer">Открыть источник →</a>` : ''
+      ].filter(Boolean).join('<br>')
+      return new ymaps.Placemark([item.latitude,item.longitude],{
+        hintContent:escapeHtml(item.name),
+        balloonContentHeader:escapeHtml(item.name),
+        balloonContentBody:body || 'Будущий объект'
+      },{preset:'islands#yellowIcon',zIndex:260})
+    })
+
+    const clusterer=new ymaps.Clusterer({gridSize:72,clusterDisableClickZoom:false})
+    clusterer.add(marks)
+    futureOverlay.current=clusterer
+    instance.geoObjects.add(clusterer)
+  },[ready,zoom,layers.future,futureDevelopments])
+
+  useEffect(() => {
+    const instance=map.current
+    const ymaps=ymapsRef.current
+    if (!ready || !instance || !ymaps) return
+
     removeOverlay(instance,workOverlay)
     const point=workLocation ? validCoordinate(workLocation.lat,workLocation.lon) : null
     if (!point) return
@@ -497,7 +564,7 @@ export function MapPanel({
 
     <div className={`map-layer-panel ${layersOpen ? 'open' : 'collapsed'}`} aria-label="Слои инфраструктуры">
       <button type="button" className="map-layer-toggle" onClick={() => setLayersOpen(value => !value)} aria-expanded={layersOpen}>
-        <Layers3 size={15}/><b>Слои на карте</b><small>{validApartmentCount} кв. · {geoObjects.length} POI</small><ChevronDown size={14}/>
+        <Layers3 size={15}/><b>Слои на карте</b><small>{validApartmentCount} кв. · {geoLoading ? 'POI…' : `${geoObjects.length} POI`}</small><ChevronDown size={14}/>
       </button>
       {layersOpen && <>
         <div className="map-lod-status">{
@@ -523,7 +590,9 @@ export function MapPanel({
           <small>{layerCounts[layer.key]}</small>
         </button>)}
         {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
-        {eligiblePoi.length > MAX_POI_MARKS && <div className="map-data-warning">POI слишком много: показываем {MAX_POI_MARKS} из {eligiblePoi.length} объектов текущего окна</div>}
+        {geoError && <div className="map-data-warning">POI: {geoError}</div>}
+        {eligiblePoi.length >= MAX_POI_MARKS && <div className="map-data-warning">Достигнут лимит {MAX_POI_MARKS} POI текущего окна. При перемещении карта запросит новый bbox.</div>}
+        <div className="map-data-warning">Районный score берётся только из backend DistrictAnalysis. Если его нет, показываем «Нет данных».</div>
       </>}
     </div>
 
