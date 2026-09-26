@@ -13,6 +13,7 @@ import { loadLastRecommendation } from '../lib/recommendations'
 import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
 import { useGeoDomStore } from '../store/useGeoDomStore'
+import { KRASNOYARSK_DISTRICTS } from '../lib/krasnoyarsk'
 
 const CitySignal = lazy(() => import('../components/CitySignal'))
 const CATALOG_PAGE_SIZE = 24
@@ -224,7 +225,7 @@ export function Catalog() {
           </div>
           <div className="intro-badge">
             <span className="intro-badge-icon"><Building2 size={22}/></span>
-            <div><b>{districts.length || '—'} районов</b><small>для осознанного выбора</small></div>
+            <div><b>{KRASNOYARSK_DISTRICTS.length} районов</b><small>для осознанного выбора</small></div>
             <ArrowUpRight size={16}/>
           </div>
           <Suspense fallback={null}><CitySignal/></Suspense>
