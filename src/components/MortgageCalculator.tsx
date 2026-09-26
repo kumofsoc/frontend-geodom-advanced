@@ -1,10 +1,36 @@
 import { useMemo,useState } from 'react'
-import { ArrowUpRight, Baby, BadgePercent, BriefcaseBusiness, Calculator, ChevronDown, Globe2, Info, Landmark, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft,ArrowRight,ArrowUpRight,Baby,BriefcaseBusiness,Building2,Check,ChevronDown,Landmark,Save,ShieldCheck,Sparkles,UserRound } from 'lucide-react'
 import { price as formatPrice } from '../lib/catalog'
 import { KRASNOYARSK_MORTGAGE_BANKS,KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE,mortgageOfferEligibility,type MortgageBankOffer } from '../lib/mortgageBanks'
-import { MORTGAGE_PROGRAM_ORDER,mortgageProgramEligibility,resolveMortgageProgram,type MortgageProgramId } from '../lib/mortgagePrograms'
+import { mortgageProgramEligibility,resolveMortgageProgram,type MortgageProgramTerms } from '../lib/mortgagePrograms'
 
 export type MortgageCalculation={ principal:number; monthlyPayment:number; totalPayment:number; overpayment:number }
+export type MortgageWizardScenario='newbuild'|'secondary'|'family'|'it'
+
+export type MortgageWizardOffer={
+  offer:MortgageBankOffer
+  rate:number|null
+  eligible:boolean
+  reasons:string[]
+  result:MortgageCalculation|null
+  programRate:boolean
+  estimated:boolean
+}
+
+const SCENARIOS:Array<{id:MortgageWizardScenario;title:string;subtitle:string}>=[
+  {id:'newbuild',title:'Новостройка',subtitle:'Банки и программы для нового жилья'},
+  {id:'secondary',title:'Вторичка',subtitle:'Готовая квартира на вторичном рынке'},
+  {id:'family',title:'Семейная ипотека',subtitle:'Льготная программа для семей'},
+  {id:'it',title:'IT-ипотека',subtitle:'Для сотрудников аккредитованных IT-компаний'}
+]
+
+const BANK_MARKS:Record<string,string>={
+  sber:'С',tbank:'Т',alfa:'А',vtb:'ВТБ',domrf:'ДОМ',psb:'ПСБ',sovcom:'СК',
+  kuban:'КК',primsoc:'ПС',khmb:'ХМ',atb:'АТБ',akcept:'АК',levoberezhny:'ЛБ',
+  vbrr:'ВБ',uralsib:'УР',sdm:'СД',metallinvest:'МИ',ingo:'ИН',bzhf:'БЖ'
+}
+
+const savedCalculationsKey='geodom-mortgage-calculations-v1'
 
 export function calculateMortgage(price:number,downPayment:number,annualRate:number,years:number):MortgageCalculation {
   const safePrice=Math.max(0,Number.isFinite(price) ? price : 0)
@@ -18,22 +44,84 @@ export function calculateMortgage(price:number,downPayment:number,annualRate:num
   return { principal,monthlyPayment,totalPayment,overpayment:Math.max(0,totalPayment-principal) }
 }
 
-function offerCalculation(offer:MortgageBankOffer,price:number,downPayment:number,years:number) {
-  const eligibility=mortgageOfferEligibility(offer,price,downPayment,years)
-  if (!eligibility.eligible || offer.rateFrom === null) return { eligibility,result:null }
-  return { eligibility,result:calculateMortgage(price,downPayment,offer.rateFrom,years) }
+function scenarioIcon(id:MortgageWizardScenario) {
+  if (id === 'newbuild') return <Building2 size={18}/>
+  if (id === 'family') return <Baby size={18}/>
+  if (id === 'it') return <BriefcaseBusiness size={18}/>
+  return <Landmark size={18}/>
 }
 
-function programIcon(id:MortgageProgramId) {
-  if (id === 'family') return <Baby size={17}/>
-  if (id === 'it') return <BriefcaseBusiness size={17}/>
-  if (id === 'far-east') return <Globe2 size={17}/>
-  if (id === 'custom') return <SlidersHorizontal size={17}/>
-  return <Landmark size={17}/>
+function scenarioProgram(scenario:MortgageWizardScenario,childrenCount:number,youngestChildAge:number|null,apartmentArea?:number):MortgageProgramTerms {
+  if (scenario === 'family') return resolveMortgageProgram('family',{childrenCount,youngestChildAge,apartmentArea})
+  if (scenario === 'it') return resolveMortgageProgram('it',{childrenCount,youngestChildAge,apartmentArea})
+  return resolveMortgageProgram('market',{childrenCount,youngestChildAge,apartmentArea})
+}
+
+export function buildMortgageWizardOffers({
+  scenario,
+  price,
+  downPayment,
+  years,
+  childrenCount=1,
+  youngestChildAge=3,
+  apartmentArea
+}:{
+  scenario:MortgageWizardScenario
+  price:number
+  downPayment:number
+  years:number
+  childrenCount?:number
+  youngestChildAge?:number|null
+  apartmentArea?:number
+}):MortgageWizardOffer[] {
+  const program=scenarioProgram(scenario,childrenCount,youngestChildAge,apartmentArea)
+  const programSpecific=scenario === 'family' || scenario === 'it'
+
+  return KRASNOYARSK_MORTGAGE_BANKS.map(offer => {
+    if (programSpecific) {
+      const eligibility=mortgageProgramEligibility(program,price,downPayment,years)
+      const rate=program.rate
+      return {
+        offer,
+        rate,
+        eligible:eligibility.eligible && rate !== null,
+        reasons:eligibility.reasons,
+        result:eligibility.eligible && rate !== null ? calculateMortgage(price,downPayment,rate,years) : null,
+        programRate:true,
+        estimated:false
+      }
+    }
+
+    const eligibility=mortgageOfferEligibility(offer,price,downPayment,years)
+    return {
+      offer,
+      rate:offer.rateFrom,
+      eligible:eligibility.eligible && offer.rateFrom !== null,
+      reasons:eligibility.reasons,
+      result:eligibility.eligible && offer.rateFrom !== null ? calculateMortgage(price,downPayment,offer.rateFrom,years) : null,
+      programRate:false,
+      estimated:scenario === 'newbuild'
+    }
+  }).sort((a,b) => {
+    if (a.eligible !== b.eligible) return a.eligible ? -1 : 1
+    if (a.result && b.result && a.result.monthlyPayment !== b.result.monthlyPayment) return a.result.monthlyPayment-b.result.monthlyPayment
+    if (a.rate !== null && b.rate !== null && a.rate !== b.rate) return a.rate-b.rate
+    if (a.rate !== null) return -1
+    if (b.rate !== null) return 1
+    return a.offer.bank.localeCompare(b.offer.bank,'ru')
+  })
+}
+
+function BankMark({offer,size='normal'}:{offer:MortgageBankOffer;size?:'normal'|'large'}) {
+  return <span className={`mortgage-bank-mark mortgage-bank-mark-${offer.id} ${size === 'large' ? 'large' : ''}`} aria-hidden="true">{BANK_MARKS[offer.id] || offer.bank.slice(0,2).toUpperCase()}</span>
 }
 
 function clamp(value:number,min:number,max:number) {
   return Math.min(max,Math.max(min,Number.isFinite(value) ? value : min))
+}
+
+function scenarioLabel(id:MortgageWizardScenario) {
+  return SCENARIOS.find(item => item.id === id)?.title || 'Ипотека'
 }
 
 export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPayment=0 }:{
@@ -43,170 +131,279 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
 }) {
   const initialPrice=Math.max(300_000,Math.round(apartmentPrice))
   const initialDown=Math.min(initialPrice,defaultDownPayment > 0 ? defaultDownPayment : Math.round(initialPrice*.2))
+
+  const [step,setStep]=useState<1|2|3|4>(1)
+  const [scenario,setScenario]=useState<MortgageWizardScenario>('secondary')
+  const [bankId,setBankId]=useState('sber')
   const [propertyPrice,setPropertyPrice]=useState(initialPrice)
   const [downPayment,setDownPayment]=useState(initialDown)
-  const [customRate,setCustomRate]=useState<number|null>(null)
   const [years,setYears]=useState(20)
-  const [programId,setProgramId]=useState<MortgageProgramId>('market')
-  const [bankId,setBankId]=useState('sber')
+  const [monthlyIncome,setMonthlyIncome]=useState(0)
+  const [existingPayments,setExistingPayments]=useState(0)
+  const [employment,setEmployment]=useState<'employee'|'self'|'business'>('employee')
   const [childrenCount,setChildrenCount]=useState(1)
   const [youngestChildAge,setYoungestChildAge]=useState<number|null>(3)
-  const [bankDirectoryOpen,setBankDirectoryOpen]=useState(false)
+  const [itAccredited,setItAccredited]=useState(false)
+  const [showAllBanks,setShowAllBanks]=useState(false)
+  const [saved,setSaved]=useState(false)
 
-  const programContext=useMemo(() => ({ childrenCount,youngestChildAge,apartmentArea }),[childrenCount,youngestChildAge,apartmentArea])
-  const programs=useMemo(() => MORTGAGE_PROGRAM_ORDER.map(id => resolveMortgageProgram(id,programContext)),[programContext])
-  const selectedProgram=programs.find(program => program.id === programId) ?? programs[0]
+  const program=useMemo(
+    () => scenarioProgram(scenario,childrenCount,youngestChildAge,apartmentArea),
+    [scenario,childrenCount,youngestChildAge,apartmentArea]
+  )
 
-  const bankRows=useMemo(() => KRASNOYARSK_MORTGAGE_BANKS.map(offer => {
-    const calculated=offerCalculation(offer,propertyPrice,downPayment,years)
-    return { offer,...calculated }
-  }).sort((a,b) => {
-    if (a.result && b.result) return a.result.monthlyPayment-b.result.monthlyPayment
-    if (a.result) return -1
-    if (b.result) return 1
-    return a.offer.bank.localeCompare(b.offer.bank,'ru')
-  }),[propertyPrice,downPayment,years])
+  const offers=useMemo(() => buildMortgageWizardOffers({
+    scenario,
+    price:propertyPrice,
+    downPayment,
+    years,
+    childrenCount,
+    youngestChildAge,
+    apartmentArea
+  }),[scenario,propertyPrice,downPayment,years,childrenCount,youngestChildAge,apartmentArea])
 
-  const selectedBankOffer=KRASNOYARSK_MORTGAGE_BANKS.find(offer => offer.id === bankId) ?? KRASNOYARSK_MORTGAGE_BANKS[0]
-  const selectedBank=offerCalculation(selectedBankOffer,propertyPrice,downPayment,years)
-  const programEligibility=mortgageProgramEligibility(selectedProgram,propertyPrice,downPayment,years)
-  const annualRate=programId === 'market' ? selectedBankOffer.rateFrom : programId === 'custom' ? customRate : selectedProgram.rate
-  const result=annualRate === null ? null : calculateMortgage(propertyPrice,downPayment,annualRate,years)
-  const calculationAvailable=Boolean(result && (programId !== 'market' || selectedBank.eligibility.eligible) && (programId === 'market' || programId === 'custom' || programEligibility.eligible))
-  const principal=Math.max(0,propertyPrice-Math.min(propertyPrice,downPayment))
-  const downPercent=propertyPrice > 0 ? Math.round(Math.min(downPayment,propertyPrice)/propertyPrice*1000)/10 : 0
-  const eligibleBanks=bankRows.filter(row => row.result).length
+  const selected=offers.find(item => item.offer.id === bankId) ?? offers[0]
+  const best=offers.find(item => item.eligible && item.result) ?? offers[0]
+  const downPercent=propertyPrice > 0 ? downPayment/propertyPrice*100 : 0
+  const paymentLoad=selected?.result && monthlyIncome > 0 ? (selected.result.monthlyPayment+existingPayments)/monthlyIncome*100 : null
   const priceMax=Math.max(30_000_000,Math.ceil(propertyPrice*1.4/1_000_000)*1_000_000)
-  const requiredProgramDown=Math.max(
-    selectedProgram.minDownPaymentPercent === null ? 0 : propertyPrice*selectedProgram.minDownPaymentPercent/100,
-    selectedProgram.maxAmount === null ? 0 : propertyPrice-selectedProgram.maxAmount
-  )
-  const suggestedDown=Math.ceil(Math.max(0,requiredProgramDown)/10_000)*10_000
-  const marketRequiredDown=Math.max(
-    selectedBankOffer.minDownPaymentPercent === null ? 0 : propertyPrice*selectedBankOffer.minDownPaymentPercent/100,
-    selectedBankOffer.maxAmount === null ? 0 : propertyPrice-selectedBankOffer.maxAmount
-  )
-  const marketSuggestedDown=Math.ceil(Math.max(0,marketRequiredDown)/10_000)*10_000
-  const programReasons=programId === 'market' ? selectedBank.eligibility.reasons : programId === 'custom' ? [] : programEligibility.reasons
+  const step3Offers=offers.slice(0,5)
+  const otherOffers=offers.filter(item => item.offer.id !== selected?.offer.id)
+  const step4Others=(showAllBanks ? otherOffers : otherOffers.slice(0,3))
 
-  function changeProgram(id:MortgageProgramId) {
-    setProgramId(id)
-    const next=resolveMortgageProgram(id,programContext)
-    if (next.maxYears !== null && years > next.maxYears) setYears(next.maxYears)
+  function chooseScenario(next:MortgageWizardScenario) {
+    setScenario(next)
+    const nextOffers=buildMortgageWizardOffers({
+      scenario:next,
+      price:propertyPrice,
+      downPayment,
+      years,
+      childrenCount,
+      youngestChildAge,
+      apartmentArea
+    })
+    const currentStillExists=nextOffers.some(item => item.offer.id === bankId)
+    if (!currentStillExists && nextOffers[0]) setBankId(nextOffers[0].offer.id)
   }
 
-  function fitProgram() {
-    if (programId === 'market') {
-      setDownPayment(clamp(marketSuggestedDown,0,propertyPrice))
-      if (selectedBankOffer.maxYears !== null && years > selectedBankOffer.maxYears) setYears(selectedBankOffer.maxYears)
-      return
+  function goToFinal() {
+    if (!selected?.eligible && best?.eligible) setBankId(best.offer.id)
+    setStep(4)
+  }
+
+  function saveCalculation() {
+    if (!selected?.result) return
+    const record={
+      id:globalThis.crypto?.randomUUID?.() ?? `mortgage-${Date.now()}`,
+      createdAt:new Date().toISOString(),
+      apartmentPrice:propertyPrice,
+      downPayment,
+      years,
+      scenario,
+      bankId:selected.offer.id,
+      bank:selected.offer.bank,
+      rate:selected.rate,
+      monthlyPayment:selected.result.monthlyPayment,
+      totalPayment:selected.result.totalPayment,
+      overpayment:selected.result.overpayment
     }
-    setDownPayment(clamp(suggestedDown,0,propertyPrice))
-    if (selectedProgram.maxYears !== null && years > selectedProgram.maxYears) setYears(selectedProgram.maxYears)
+    try {
+      const current=JSON.parse(localStorage.getItem(savedCalculationsKey) || '[]')
+      const items=Array.isArray(current) ? current : []
+      localStorage.setItem(savedCalculationsKey,JSON.stringify([record,...items].slice(0,10)))
+      setSaved(true)
+    } catch {
+      setSaved(false)
+    }
   }
 
-  return <section className="mortgage-calculator mortgage-calculator-v2" aria-labelledby="mortgage-title">
-    <div className="mortgage-v2-head">
-      <div><span className="mortgage-v2-kicker"><Calculator size={15}/> GEODOM · РАСЧЁТ ПО ЭТОЙ КВАРТИРЕ</span><h3 id="mortgage-title">Ипотечный калькулятор</h3><p>Выберите программу, настройте стоимость, взнос и срок — платёж пересчитается сразу.</p></div>
-      <span className="mortgage-v2-snapshot">Красноярск · {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}</span>
+  const familyNeedsAttention=scenario === 'family' && !program.available
+  const itNeedsAttention=scenario === 'it' && !itAccredited
+
+  return <section className="mortgage-wizard" aria-labelledby="mortgage-title">
+    <header className="mortgage-wizard-header">
+      <div>
+        <span className="mortgage-wizard-kicker">GEODOM · ИПОТЕКА · КРАСНОЯРСК</span>
+        <h3 id="mortgage-title">Ипотечный калькулятор</h3>
+        <p>Пройдите 4 шага: программа и банк → параметры заёмщика → расчёт → итоговое предложение.</p>
+      </div>
+      <span className="mortgage-wizard-date">Данные банков: {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}</span>
+    </header>
+
+    <div className="mortgage-wizard-progress" aria-label={`Шаг ${step} из 4`}>
+      <div className="mortgage-wizard-bars">{[1,2,3,4].map(value => <span key={value} className={value <= step ? 'active' : ''}/>)}</div>
+      <b>Шаг {step} из 4</b>
     </div>
 
-    <div className="mortgage-program-grid" role="tablist" aria-label="Ипотечная программа">
-      {programs.map(program => <button type="button" role="tab" aria-selected={programId === program.id} className={'mortgage-program-card '+(programId === program.id ? 'active ' : '')+(!program.available ? 'unavailable' : '')} key={program.id} onClick={() => changeProgram(program.id)}>
-        <span className="mortgage-program-icon">{programIcon(program.id)}</span>
-        <span className="mortgage-program-copy"><b>{program.shortTitle}</b><small>{program.badge}</small></span>
-      </button>)}
-    </div>
-
-    <div className="mortgage-v2-layout">
-      <div className="mortgage-v2-controls">
-        <div className="mortgage-control-card">
-          <div className="mortgage-control-title"><span>Стоимость недвижимости</span><b>{formatPrice(Math.round(propertyPrice))}</b></div>
-          <input className="mortgage-range" aria-label="Стоимость недвижимости" type="range" min="300000" max={priceMax} step="50000" value={propertyPrice} onChange={event => { const next=Number(event.target.value); setPropertyPrice(next); setDownPayment(current => Math.min(current,next)) }}/>
-          <div className="mortgage-control-input"><input type="number" min="300000" step="50000" value={propertyPrice} onChange={event => { const next=Math.max(300_000,Number(event.target.value) || 300_000); setPropertyPrice(next); setDownPayment(current => Math.min(current,next)) }}/><span>₽</span></div>
-        </div>
-
-        <div className="mortgage-control-card">
-          <div className="mortgage-control-title"><span>Первоначальный взнос</span><b>{downPercent}%</b></div>
-          <input className="mortgage-range" aria-label="Первоначальный взнос" type="range" min="0" max={propertyPrice} step="10000" value={Math.min(downPayment,propertyPrice)} onChange={event => setDownPayment(Number(event.target.value))}/>
-          <div className="mortgage-control-input split"><input type="number" min="0" max={propertyPrice} step="10000" value={downPayment} onChange={event => setDownPayment(clamp(Number(event.target.value),0,propertyPrice))}/><span>₽</span><em>{downPercent}%</em></div>
-        </div>
-
-        <div className="mortgage-control-card">
-          <div className="mortgage-control-title"><span>Срок кредита</span><b>{years} {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}</b></div>
-          <input className="mortgage-range" aria-label="Срок кредита" type="range" min="1" max={selectedProgram.maxYears ?? 30} step="1" value={Math.min(years,selectedProgram.maxYears ?? 30)} onChange={event => setYears(Number(event.target.value))}/>
-          <div className="mortgage-years-scale"><span>1 год</span><span>{selectedProgram.maxYears ?? 30} лет</span></div>
-        </div>
-
-        {programId === 'market' && <div className="mortgage-control-card">
-          <div className="mortgage-control-title"><span>Банк</span><b>{selectedBankOffer.rateFrom === null ? 'ставка уточняется' : 'от '+selectedBankOffer.rateFrom+'%'}</b></div>
-          <div className="mortgage-select-wrap mortgage-v2-select"><select value={bankId} onChange={event => setBankId(event.target.value)}>{KRASNOYARSK_MORTGAGE_BANKS.map(offer => <option value={offer.id} key={offer.id}>{offer.bank} · {offer.rateFrom === null ? 'уточнить' : 'от '+offer.rateFrom+'%'}</option>)}</select><ChevronDown size={15}/></div>
-          <small className="mortgage-control-help">{selectedBankOffer.program}</small>
-        </div>}
-
-        {programId === 'custom' && <div className="mortgage-control-card">
-          <div className="mortgage-control-title"><span>Ставка по предложению банка</span><b>{customRate === null ? '—' : customRate+'%'}</b></div>
-          <input className="mortgage-range" aria-label="Своя ставка" type="range" min="0" max="40" step="0.1" value={customRate ?? 0} onChange={event => setCustomRate(Number(event.target.value))}/>
-          <div className="mortgage-control-input"><input type="number" min="0" max="100" step="0.1" value={customRate ?? ''} onChange={event => setCustomRate(event.target.value === '' ? null : Math.max(0,Number(event.target.value)))}/><span>%</span></div>
-        </div>}
-
-        {programId === 'family' && <div className="mortgage-family-settings">
-          <div className="mortgage-family-head"><Baby size={17}/><div><b>Параметры семьи</b><small>Нужны для программных условий, особенно после 01.10.2026.</small></div></div>
-          <label><span>Количество детей</span><select value={childrenCount} onChange={event => setChildrenCount(Number(event.target.value))}>{[1,2,3,4,5,6].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-          <label><span>Возраст младшего</span><select value={youngestChildAge ?? ''} onChange={event => setYoungestChildAge(event.target.value === '' ? null : Number(event.target.value))}><option value="">Не указан</option>{Array.from({length:18},(_,index) => <option value={index} key={index}>{index} {index === 1 ? 'год' : index > 1 && index < 5 ? 'года' : 'лет'}</option>)}</select></label>
-        </div>}
-
-        {programId !== 'market' && programId !== 'custom' && <div className={'mortgage-program-note '+(selectedProgram.available ? '' : 'warning')}><Info size={16}/><div><b>{selectedProgram.title}</b><p>{selectedProgram.description}</p>{selectedProgram.warning && <small>{selectedProgram.warning}</small>}{selectedProgram.sourceUrl && <a href={selectedProgram.sourceUrl} target="_blank" rel="noopener noreferrer">Условия программы <ArrowUpRight size={12}/></a>}</div></div>}
-
-        {programReasons.length > 0 && <div className="mortgage-fit-warning"><div><BadgePercent size={16}/><span><b>Текущие параметры не проходят</b>{programReasons.join(' · ')}</span></div>{programId !== 'far-east' && <button type="button" onClick={fitProgram}>{programId === 'market' ? 'Подогнать к банку' : 'Подогнать взнос и срок'}</button>}</div>}
+    {step === 1 && <div className="mortgage-wizard-step">
+      <div className="mortgage-step-heading">
+        <span>01 / БАНК И ПРОГРАММА</span>
+        <h4>Выберите банк</h4>
+        <p>Сравните условия ведущих банков и выберите предложение, с которого хотите начать расчёт.</p>
       </div>
 
-      <aside className="mortgage-summary-card" aria-live="polite">
-        <div className="mortgage-summary-head">
-          <div className="mortgage-summary-program">
-            <span>{programIcon(programId)}</span>
-            <div><small>Расчёт по программе</small><b>{programId === 'market' ? selectedBankOffer.bank : selectedProgram.title}</b></div>
-          </div>
-          <span className={calculationAvailable ? 'mortgage-summary-state ready' : 'mortgage-summary-state'}>{calculationAvailable ? 'Расчёт готов' : 'Нужны параметры'}</span>
-        </div>
+      <div className="mortgage-scenario-tabs" role="tablist" aria-label="Тип ипотечной программы">
+        {SCENARIOS.map(item => <button type="button" role="tab" aria-selected={scenario === item.id} className={scenario === item.id ? 'active' : ''} key={item.id} onClick={() => chooseScenario(item.id)}>
+          <span>{scenarioIcon(item.id)}</span>
+          <div><b>{item.title}</b><small>{item.subtitle}</small></div>
+        </button>)}
+      </div>
 
-        <div className="mortgage-summary-payment">
-          <span>Ежемесячный платёж</span>
-          <strong>{calculationAvailable ? formatPrice(Math.round(result!.monthlyPayment)) : '—'}</strong>
-          <small>{annualRate === null ? 'Укажите ставку' : annualRate+'% годовых · аннуитет'}</small>
-        </div>
+      <div className="mortgage-step-note">
+        <ShieldCheck size={16}/>
+        <span>{scenario === 'newbuild'
+          ? 'Для новостройки отдельного банковского feed пока нет: на карточках показан текущий банковский ориентир, а финальные условия нужно подтвердить у банка.'
+          : scenario === 'family' || scenario === 'it'
+            ? 'Ставка на карточках — параметр госпрограммы. Участие конкретного банка и финальные условия нужно подтвердить отдельно.'
+            : 'Для вторичного жилья используем текущий frontend snapshot публичных предложений банков.'}</span>
+      </div>
 
-        <div className="mortgage-summary-grid">
-          <div><span>Сумма кредита</span><b>{formatPrice(Math.round(principal))}</b></div>
-          <div><span>Первый взнос</span><b>{formatPrice(Math.round(downPayment))}</b></div>
-          <div><span>Переплата</span><b>{calculationAvailable ? formatPrice(Math.round(result!.overpayment)) : '—'}</b></div>
-          <div><span>Всего выплат</span><b>{calculationAvailable ? formatPrice(Math.round(result!.totalPayment)) : '—'}</b></div>
-        </div>
+      <div className="mortgage-bank-choice-grid">
+        {offers.map(item => <button type="button" key={item.offer.id} className={`mortgage-bank-choice ${bankId === item.offer.id ? 'active' : ''}`} onClick={() => setBankId(item.offer.id)}>
+          <BankMark offer={item.offer}/>
+          <span className="mortgage-bank-choice-copy"><b>{item.offer.bank}</b><small>{scenario === 'family' ? 'Семейная ипотека' : scenario === 'it' ? 'IT-ипотека' : item.offer.program}</small></span>
+          <span className="mortgage-bank-choice-rate"><b>{item.rate === null ? 'Уточнить' : `от ${item.rate}%`}</b><small>{item.eligible ? 'можно рассчитать' : item.reasons[0] || 'нужно уточнить'}</small></span>
+          <span className="mortgage-bank-radio">{bankId === item.offer.id && <Check size={13}/>}</span>
+        </button>)}
+      </div>
 
-        <div className={calculationAvailable ? 'mortgage-summary-message ready' : 'mortgage-summary-message error'}>
-          {calculationAvailable ? 'Ориентировочный расчёт. Финальные условия подтвердит банк.' : programReasons[0] || 'Для расчёта заполните ставку.'}
-        </div>
-      </aside>
-    </div>
-
-    {programId === 'market' && <details
-      className="mortgage-bank-directory mortgage-v2-bank-directory"
-      open={bankDirectoryOpen}
-      onToggle={event => setBankDirectoryOpen(event.currentTarget.open)}
-    >
-      <summary><span>Сравнить банки Красноярска</span><b>{eligibleBanks} подходят под текущие параметры</b></summary>
-      {bankDirectoryOpen && <div className="mortgage-bank-list">{bankRows.map(({offer,eligibility,result:bankResult}) => <button type="button" key={offer.id} className={bankId === offer.id ? 'selected' : ''} onClick={() => setBankId(offer.id)}>
-        <span className="mortgage-bank-logo">{offer.bank.slice(0,2).toUpperCase()}</span><span className="mortgage-bank-copy"><b>{offer.bank}</b><small>{offer.program}</small></span><span className="mortgage-bank-rate">{offer.rateFrom === null ? '—' : offer.rateFrom+'%'}<small>{offer.minDownPaymentPercent === null ? 'взнос уточнить' : 'взнос от '+offer.minDownPaymentPercent+'%'}</small></span><span className={bankResult ? 'mortgage-bank-payment' : 'mortgage-bank-payment unavailable'}>{bankResult ? formatPrice(Math.round(bankResult.monthlyPayment))+'/мес' : eligibility.reasons[0] || 'Уточнить'}</span>
-      </button>)}</div>}
-      <div className="mortgage-snapshot-note">Snapshot на {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}. Рыночные ставки меняются; перед сделкой проверьте источник выбранного банка.</div>
-    </details>}
-
-    {programId === 'market' && <div className={'mortgage-bank-status compact '+(selectedBank.eligibility.eligible ? 'eligible' : 'ineligible')}>
-      <div><span>{selectedBankOffer.bank}</span><b>{selectedBankOffer.rateFrom === null ? 'Ставка требует проверки' : 'от '+selectedBankOffer.rateFrom+'%'}</b></div>
-      <div><span>Минимальный взнос</span><b>{selectedBankOffer.minDownPaymentPercent === null ? 'уточнить' : 'от '+selectedBankOffer.minDownPaymentPercent+'%'}</b></div>
-      {selectedBankOffer.notes && <p>{selectedBankOffer.notes}</p>}<a href={selectedBankOffer.sourceUrl} target="_blank" rel="noopener noreferrer">Источник банка <ArrowUpRight size={13}/></a>
+      <div className="mortgage-wizard-actions end">
+        <button type="button" className="mortgage-wizard-primary" onClick={() => setStep(2)}>Продолжить <ArrowRight size={17}/></button>
+      </div>
     </div>}
 
-    <p className="mortgage-note mortgage-v2-note"><Landmark size={14}/> Расчёт предварительный. Льготная программа не означает автоматическое право на неё: банк отдельно проверяет заёмщика, объект и документы. GeoDom не отправляет заявку и не обещает одобрение.</p>
+    {step === 2 && <div className="mortgage-wizard-step">
+      <div className="mortgage-step-heading">
+        <span>02 / ПАРАМЕТРЫ ЗАЁМЩИКА</span>
+        <h4>Проверьте свой сценарий</h4>
+        <p>Эти данные не отправляются в банк. Они помогают показать нагрузку и проверить базовые условия выбранной программы.</p>
+      </div>
+
+      <div className="mortgage-borrower-grid">
+        <label><span>Доход семьи в месяц</span><div><input type="number" min="0" step="5000" value={monthlyIncome || ''} placeholder="Например, 180000" onChange={event => setMonthlyIncome(Math.max(0,Number(event.target.value)))}/><em>₽</em></div><small>Необязательно, но пригодится для оценки нагрузки.</small></label>
+        <label><span>Другие платежи по кредитам</span><div><input type="number" min="0" step="1000" value={existingPayments || ''} placeholder="0" onChange={event => setExistingPayments(Math.max(0,Number(event.target.value)))}/><em>₽/мес</em></div><small>Кредитки, автокредиты и другие регулярные платежи.</small></label>
+        <label><span>Формат занятости</span><div className="mortgage-borrower-select"><select value={employment} onChange={event => setEmployment(event.target.value as typeof employment)}><option value="employee">Наёмный сотрудник</option><option value="self">Самозанятый</option><option value="business">ИП / владелец бизнеса</option></select><ChevronDown size={15}/></div><small>Пока используется как часть профиля, а не как банковское решение.</small></label>
+        <div className="mortgage-borrower-bank"><BankMark offer={selected.offer} size="large"/><div><span>Выбранный банк</span><b>{selected.offer.bank}</b><small>{selected.rate === null ? 'ставка уточняется' : `${selected.rate}% в текущем сценарии`}</small></div></div>
+      </div>
+
+      {scenario === 'family' && <div className="mortgage-program-check">
+        <div><Baby size={18}/><span><b>Семейная ипотека</b><small>Уточним параметры семьи для проверки льготного сценария.</small></span></div>
+        <label><span>Количество детей</span><select value={childrenCount} onChange={event => setChildrenCount(Number(event.target.value))}>{[1,2,3,4,5,6].map(value => <option value={value} key={value}>{value}</option>)}</select></label>
+        <label><span>Возраст младшего</span><select value={youngestChildAge ?? ''} onChange={event => setYoungestChildAge(event.target.value === '' ? null : Number(event.target.value))}><option value="">Не указан</option>{Array.from({length:18},(_,index) => <option value={index} key={index}>{index} {index === 1 ? 'год' : index > 1 && index < 5 ? 'года' : 'лет'}</option>)}</select></label>
+      </div>}
+
+      {scenario === 'it' && <label className="mortgage-it-check"><input type="checkbox" checked={itAccredited} onChange={event => setItAccredited(event.target.checked)}/><BriefcaseBusiness size={18}/><span><b>Работаю в аккредитованной IT-компании</b><small>Это frontend-проверка сценария. Реальную аккредитацию и требования подтверждает банк.</small></span></label>}
+
+      {(familyNeedsAttention || itNeedsAttention) && <div className="mortgage-step-warning">{familyNeedsAttention ? program.warning || 'Проверьте параметры семейной программы.' : 'Для IT-ипотеки нужно подтвердить работу в аккредитованной IT-компании.'}</div>}
+
+      <div className="mortgage-wizard-actions">
+        <button type="button" className="mortgage-wizard-secondary" onClick={() => setStep(1)}><ArrowLeft size={16}/> Назад</button>
+        <button type="button" className="mortgage-wizard-primary" onClick={() => setStep(3)}>К параметрам ипотеки <ArrowRight size={17}/></button>
+      </div>
+    </div>}
+
+    {step === 3 && <div className="mortgage-wizard-step">
+      <div className="mortgage-step-heading">
+        <span>03 / ПАРАМЕТРЫ И ПРЕДЛОЖЕНИЯ</span>
+        <h4>Параметры ипотеки</h4>
+        <p>Изменяйте сумму, взнос и срок — предложения пересортируются по расчётному ежемесячному платежу.</p>
+      </div>
+
+      <div className="mortgage-parameter-grid">
+        <label>
+          <span>Стоимость жилья <b>{formatPrice(Math.round(propertyPrice))}</b></span>
+          <input type="range" min="300000" max={priceMax} step="50000" value={propertyPrice} onChange={event => { const next=Number(event.target.value);setPropertyPrice(next);setDownPayment(current => Math.min(current,next)) }}/>
+          <div><small>300 000 ₽</small><input type="number" min="300000" step="50000" value={propertyPrice} onChange={event => { const next=Math.max(300_000,Number(event.target.value) || 300_000);setPropertyPrice(next);setDownPayment(current => Math.min(current,next)) }}/><small>{formatPrice(priceMax)}</small></div>
+        </label>
+        <label>
+          <span>Первоначальный взнос <b>{formatPrice(Math.round(downPayment))}</b></span>
+          <input type="range" min="0" max={propertyPrice} step="10000" value={downPayment} onChange={event => setDownPayment(Number(event.target.value))}/>
+          <div><small>0 ₽</small><input type="number" min="0" max={propertyPrice} step="10000" value={downPayment} onChange={event => setDownPayment(clamp(Number(event.target.value),0,propertyPrice))}/><small>{downPercent.toFixed(1)}%</small></div>
+        </label>
+        <label>
+          <span>Срок <b>{years} лет</b></span>
+          <input type="range" min="1" max="30" step="1" value={years} onChange={event => setYears(Number(event.target.value))}/>
+          <div><small>1 год</small><select value={years} onChange={event => setYears(Number(event.target.value))}>{[5,10,15,20,25,30].map(value => <option key={value} value={value}>{value} лет</option>)}</select><small>30 лет</small></div>
+        </label>
+        <label className="mortgage-program-select-card">
+          <span>Программа</span>
+          <div><span>{scenarioIcon(scenario)}</span><select value={scenario} onChange={event => chooseScenario(event.target.value as MortgageWizardScenario)}>{SCENARIOS.map(item => <option value={item.id} key={item.id}>{item.title}</option>)}</select><ChevronDown size={15}/></div>
+          <small>Можно изменить программу на этом шаге.</small>
+        </label>
+      </div>
+
+      <div className="mortgage-offers-head">
+        <div><span>ЛУЧШИЕ ПРЕДЛОЖЕНИЯ</span><h5>{step3Offers.filter(item => item.eligible).length} предложений, отсортированных по расчётной выгоде</h5></div>
+        <small>{scenario === 'family' || scenario === 'it' ? 'Для льготных программ ставка общая; участие банка нужно подтвердить.' : scenario === 'newbuild' ? 'Ставки новостройки пока ориентировочные.' : 'На основе текущего банковского snapshot.'}</small>
+      </div>
+
+      <div className="mortgage-offer-list">
+        {step3Offers.map((item,index) => <button type="button" key={item.offer.id} className={`mortgage-offer-row ${bankId === item.offer.id ? 'active' : ''} ${!item.eligible ? 'disabled' : ''}`} onClick={() => setBankId(item.offer.id)}>
+          <BankMark offer={item.offer}/>
+          <span className="mortgage-offer-bank"><b>{item.offer.bank}</b><small>{scenarioLabel(scenario)}</small></span>
+          <span><small>Ставка</small><b>{item.rate === null ? '—' : `${item.rate}%`}</b></span>
+          <span><small>Платёж в месяц</small><b>{item.result ? formatPrice(Math.round(item.result.monthlyPayment)) : 'Не проходит'}</b></span>
+          <span className="mortgage-offer-choice">{bankId === item.offer.id ? <Check size={15}/> : index+1}</span>
+        </button>)}
+      </div>
+
+      <div className="mortgage-wizard-actions">
+        <button type="button" className="mortgage-wizard-secondary" onClick={() => setStep(2)}><ArrowLeft size={16}/> Назад</button>
+        <button type="button" className="mortgage-wizard-primary" onClick={goToFinal}>Показать расчёт <ArrowRight size={17}/></button>
+      </div>
+    </div>}
+
+    {step === 4 && <div className="mortgage-wizard-step">
+      <div className="mortgage-step-heading final">
+        <span>04 / РЕЗУЛЬТАТ</span>
+        <h4>Ваш расчёт готов</h4>
+        <p>Вы можете вернуться к параметрам, выбрать другой банк или сохранить расчёт.</p>
+      </div>
+
+      <div className="mortgage-final-featured">
+        <div className="mortgage-final-badge"><Sparkles size={14}/>{selected.offer.id === best.offer.id ? 'Лучшее предложение по текущему расчёту' : 'Выбранное предложение'}</div>
+        <div className="mortgage-final-bank">
+          <BankMark offer={selected.offer} size="large"/>
+          <div><h5>{selected.offer.bank}</h5><p>{scenarioLabel(scenario)} · {selected.offer.program}</p></div>
+          <a href={selected.offer.sourceUrl} target="_blank" rel="noopener noreferrer">Источник <ArrowUpRight size={14}/></a>
+        </div>
+
+        <div className="mortgage-final-metrics">
+          <div><span>Ставка</span><b>{selected.rate === null ? '—' : `${selected.rate}%`}</b></div>
+          <div className="payment"><span>Платёж в месяц</span><b>{selected.result ? formatPrice(Math.round(selected.result.monthlyPayment)) : '—'}</b></div>
+          <div><span>Сумма кредита</span><b>{selected.result ? formatPrice(Math.round(selected.result.principal)) : formatPrice(Math.max(0,propertyPrice-downPayment))}</b></div>
+          <div><span>Первоначальный взнос</span><b>{formatPrice(Math.round(downPayment))}</b></div>
+          <div><span>Срок</span><b>{years} лет</b></div>
+          <div><span>Переплата</span><b>{selected.result ? formatPrice(Math.round(selected.result.overpayment)) : '—'}</b></div>
+        </div>
+
+        {paymentLoad !== null && <div className="mortgage-final-load"><UserRound size={15}/><span>Платежи после ипотеки составят примерно <b>{paymentLoad.toFixed(0)}%</b> указанного месячного дохода. Это только ориентир, а не банковская оценка платёжеспособности.</span></div>}
+        {!selected.eligible && <div className="mortgage-final-warning">{selected.reasons[0] || 'Текущие параметры нужно уточнить у банка.'}</div>}
+      </div>
+
+      <div className="mortgage-other-head">
+        <div><h5>Другие варианты</h5><p>Можно переключиться на другой банк без возврата к началу.</p></div>
+        <button type="button" onClick={() => setShowAllBanks(value => !value)}>{showAllBanks ? 'Скрыть часть' : 'Все предложения'} <ArrowRight size={14}/></button>
+      </div>
+
+      <div className="mortgage-other-grid">
+        {step4Others.map(item => <button type="button" key={item.offer.id} onClick={() => setBankId(item.offer.id)} className={!item.eligible ? 'disabled' : ''}>
+          <BankMark offer={item.offer}/>
+          <span><b>{item.offer.bank}</b><small>{item.rate === null ? 'Ставка уточняется' : `${item.rate}%`}</small></span>
+          <strong>{item.result ? formatPrice(Math.round(item.result.monthlyPayment))+'/мес' : 'Уточнить'}</strong>
+          <ArrowRight size={14}/>
+        </button>)}
+      </div>
+
+      <div className="mortgage-final-actions">
+        <a className="mortgage-apply-button" href={selected.offer.sourceUrl} target="_blank" rel="noopener noreferrer">Подать заявку <ArrowRight size={18}/></a>
+        <button type="button" className={saved ? 'saved' : ''} onClick={saveCalculation}><Save size={17}/>{saved ? 'Расчёт сохранён' : 'Сохранить расчёт'}</button>
+      </div>
+      <p className="mortgage-final-footnote">Сейчас «Подать заявку» открывает источник выбранного предложения. Партнёрская отправка заявки появится после backend-интеграции.</p>
+
+      <div className="mortgage-wizard-actions start">
+        <button type="button" className="mortgage-wizard-secondary" onClick={() => setStep(3)}><ArrowLeft size={16}/> Изменить параметры</button>
+      </div>
+    </div>}
   </section>
 }
