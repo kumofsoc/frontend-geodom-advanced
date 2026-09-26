@@ -49,9 +49,11 @@ export function PreferencePanel({
     <form onSubmit={e => { e.preventDefault(); void onApply().then(ok => { if (ok) onClose() }) }}>
       <div className="sidebar-block">
         <label className="sidebar-label" htmlFor="budget-max">Бюджет на жильё, ₽</label>
-        <input id="budget-max" type="number" min="1" step="100000" value={value.budget_max || ''} onChange={e => onChange({...value,budget_max:Number(e.target.value)})} required/>
+        <input id="budget-max" type="number" inputMode="numeric" min="1" step="1" value={value.budget_max || ''} onChange={e => onChange({...value,budget_max:e.target.value === '' ? 0 : Number(e.target.value)})} required/>
+        <div className="money-preview">{value.budget_max > 0 ? new Intl.NumberFormat('ru-RU').format(value.budget_max) + ' ₽' : 'Введите любую сумму'}</div>
         <label className="sidebar-label inline" htmlFor="down-payment">Первоначальный взнос, ₽</label>
-        <input id="down-payment" type="number" min="0" step="100000" value={value.down_payment} onChange={e => onChange({...value,down_payment:Number(e.target.value)})}/>
+        <input id="down-payment" type="number" inputMode="numeric" min="0" step="1" value={value.down_payment || ''} onChange={e => onChange({...value,down_payment:e.target.value === '' ? 0 : Number(e.target.value)})}/>
+        <div className="money-preview">{value.down_payment > 0 ? new Intl.NumberFormat('ru-RU').format(value.down_payment) + ' ₽' : 'Без первоначального взноса'}</div>
       </div>
 
       <div className="sidebar-block">
