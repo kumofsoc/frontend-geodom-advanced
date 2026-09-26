@@ -5,10 +5,10 @@ import { PageLoading } from '../components/Ui'
 import { api } from '../lib/api'
 import { validateApartment } from '../lib/catalog'
 import type { ListingInput } from '../types'
-import { useAuth } from '../App'
+import { useGeoDomStore } from '../store/useGeoDomStore'
 const blank: ListingInput = { title:'', address:'', price:0, area:0, rooms:1, floor:1, total_floors:1, description:'', kitchen_area:undefined, renovation:'' }
 export function ListingForm() {
-  const { id } = useParams(); const { user } = useAuth(); const navigate = useNavigate(); const [values,setValues] = useState<ListingInput>(blank); const [files,setFiles] = useState<File[]>([]); const [existingPhotos,setExistingPhotos] = useState<string[]>([]); const [loading,setLoading] = useState(!!id); const [busy,setBusy] = useState(false); const [error,setError] = useState(''); const [progress,setProgress] = useState('')
+  const { id } = useParams(); const user = useGeoDomStore(state => state.user); const navigate = useNavigate(); const [values,setValues] = useState<ListingInput>(blank); const [files,setFiles] = useState<File[]>([]); const [existingPhotos,setExistingPhotos] = useState<string[]>([]); const [loading,setLoading] = useState(!!id); const [busy,setBusy] = useState(false); const [error,setError] = useState(''); const [progress,setProgress] = useState('')
   useEffect(() => { if (!id) return; api.detail(id).then(item => { if (item.owner_id !== user?.id) throw new Error('Вы не можете редактировать это объявление'); setValues({ title:item.title,address:item.address,price:item.price,area:item.area,rooms:item.rooms,floor:item.floor,total_floors:item.total_floors,description:item.description,kitchen_area:item.kitchen_area,renovation:item.renovation }); setExistingPhotos(item.photos.map(p => p.url)) }).catch(e => setError(e.message)).finally(() => setLoading(false)) },[id,user?.id])
   function field<K extends keyof ListingInput>(key: K, value: ListingInput[K]) { setValues(prev => ({ ...prev,[key]:value })) }
   function addPhotos(list: FileList | null) { if (!list) return; const incoming = Array.from(list); if (incoming.some(f => !f.type.startsWith('image/'))) { setError('Можно загружать только изображения'); return } if (incoming.some(f => f.size > 5 * 1024 * 1024)) { setError('Каждый файл должен быть не больше 5 МБ'); return } if (files.length + existingPhotos.length + incoming.length > 10) { setError('Не больше 10 фотографий на объявление'); return } setError(''); setFiles(prev => [...prev,...incoming]) }
