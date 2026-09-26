@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { ChevronDown, Layers3 } from 'lucide-react'
 import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
@@ -70,7 +70,7 @@ function classifyGeoObject(item:GeoObject):PoiLayer|null {
   return null
 }
 
-function removeOverlay(instance:any,overlayRef:React.MutableRefObject<any>) {
+function removeOverlay(instance:any,overlayRef:MutableRefObject<any>) {
   if (!overlayRef.current) return
   try { instance.geoObjects.remove(overlayRef.current) } catch {}
   overlayRef.current=null
