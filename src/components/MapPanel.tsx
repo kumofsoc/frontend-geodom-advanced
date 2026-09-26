@@ -1,46 +1,183 @@
-import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useRef, useState } from 'react'
 import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
-export function MapPanel({ items, selectedDistrict, onDistrict }: { items: Apartment[]; selectedDistrict: string; onDistrict: (district: string) => void }) {
-  const element = useRef<HTMLDivElement>(null); const map = useRef<L.Map | null>(null); const markers = useRef<L.LayerGroup | null>(null)
-  const handler = useRef(onDistrict); handler.current = onDistrict
+import { validCoordinate } from '../lib/dataSanitizers'
+import { loadYandexMaps } from '../lib/yandexMaps'
+
+type WorkLocation = { lat:number; lon:number } | null
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char] || char))
+}
+
+function score10(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return null
+  return value > 10 ? value / 10 : value
+}
+
+export function MapPanel({
+  items,
+  selectedDistrict,
+  onDistrict,
+  workLocation,
+  workPicking,
+  onWorkLocation
+}:{
+  items:Apartment[]
+  selectedDistrict:string
+  onDistrict:(district:string)=>void
+  workLocation:WorkLocation
+  workPicking:boolean
+  onWorkLocation:(location:{ lat:number; lon:number })=>void
+}) {
+  const element = useRef<HTMLDivElement>(null)
+  const map = useRef<any>(null)
+  const ymapsRef = useRef<any>(null)
+  const districtHandler = useRef(onDistrict)
+  const workHandler = useRef(onWorkLocation)
+  const pickingRef = useRef(workPicking)
+  const resizeObserver = useRef<ResizeObserver | null>(null)
+  const [ready,setReady] = useState(false)
+  const [zoom,setZoom] = useState(11)
+  const [loadError,setLoadError] = useState('')
+
+  districtHandler.current = onDistrict
+  workHandler.current = onWorkLocation
+  pickingRef.current = workPicking
+
   useEffect(() => {
+    let cancelled = false
     if (!element.current || map.current) return
-    const instance = L.map(element.current, { zoomControl: false, scrollWheelZoom: false }).setView([56.014,92.87], 11)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors', maxZoom:19 }).addTo(instance)
-    L.control.zoom({ position:'bottomright' }).addTo(instance)
-    map.current = instance; markers.current = L.layerGroup().addTo(instance)
-    const observer = new ResizeObserver(() => instance.invalidateSize()); observer.observe(element.current)
-    return () => { observer.disconnect(); instance.remove(); map.current = null; markers.current = null }
+
+    loadYandexMaps().then(ymaps => {
+      if (cancelled || !element.current) return
+      const instance = new ymaps.Map(element.current, {
+        center:[56.014,92.87],
+        zoom:11,
+        controls:['zoomControl','fullscreenControl']
+      }, {
+        minZoom:7,
+        maxZoom:19,
+        suppressMapOpenBlock:true
+      })
+      instance.behaviors.enable(['drag','scrollZoom','dblClickZoom','multiTouch'])
+
+      instance.events.add('boundschange', (event:any) => {
+        const next = event.get('newZoom')
+        setZoom(typeof next === 'number' ? next : instance.getZoom())
+      })
+      instance.events.add('click', (event:any) => {
+        if (!pickingRef.current) return
+        const coords = event.get('coords')
+        const point = validCoordinate(coords?.[0],coords?.[1])
+        if (point) workHandler.current(point)
+      })
+
+      ymapsRef.current = ymaps
+      map.current = instance
+      resizeObserver.current = new ResizeObserver(() => instance.container.fitToViewport())
+      resizeObserver.current.observe(element.current)
+      setReady(true)
+    }).catch(error => {
+      if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить карту')
+    })
+
+    return () => {
+      cancelled = true
+      resizeObserver.current?.disconnect()
+      resizeObserver.current = null
+      map.current?.destroy()
+      map.current = null
+      ymapsRef.current = null
+    }
   },[])
+
   useEffect(() => {
-    if (!markers.current || !map.current) return
-    markers.current.clearLayers()
-    const valid = items.filter(x => x.latitude && x.longitude && x.status === 'published')
-    for (const item of valid) {
-      const active = !selectedDistrict || selectedDistrict === item.district.name
-      const icon = L.divIcon({ className:'map-pin-container', html:`<span class="map-price-pin ${active ? '' : 'muted'}">${new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)} млн ₽</span>`, iconSize:[100,34], iconAnchor:[50,34] })
-      const popup=document.createElement('div')
-      const title=document.createElement('strong'); title.textContent=item.title
-      const amount=document.createElement('div'); amount.textContent=price(item.price)
-      const link=document.createElement('a'); link.href=`/apartments/${encodeURIComponent(item.id)}`; link.textContent='Открыть квартиру →'
-      popup.append(title,amount,link)
-      L.marker([item.latitude,item.longitude], { icon }).bindPopup(popup).addTo(markers.current!)
-    }
+    const instance = map.current
+    const ymaps = ymapsRef.current
+    if (!ready || !instance || !ymaps) return
+
+    instance.geoObjects.removeAll()
+    const valid = items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude))
     const groups = new Map<string,Apartment[]>()
-    for (const item of valid) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
-    for (const [district,houses] of groups) {
-      const lat = houses.reduce((sum,x) => sum+x.latitude,0)/houses.length
-      const lng = houses.reduce((sum,x) => sum+x.longitude,0)/houses.length
-      const avg = Math.round(houses.reduce((sum,x) => sum+(x.recommendation.score || 0),0)/houses.length)
-      const pin=document.createElement('span'); pin.className=`district-map-pin ${selectedDistrict === district ? 'active' : ''}`
-      pin.append(document.createTextNode(district))
-      const score=document.createElement('b'); score.textContent=(avg/10).toFixed(1); pin.append(score)
-      const icon = L.divIcon({ className:'district-pin-container', html:pin, iconSize:[120,58], iconAnchor:[60,90] })
-      L.marker([lat,lng],{ icon,zIndexOffset:1000 }).on('click',() => handler.current(district)).addTo(markers.current!)
+
+    for (const item of valid) {
+      const point = validCoordinate(item.latitude,item.longitude)
+      if (!point) continue
+      groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
+
+      const active = !selectedDistrict || selectedDistrict === item.district.name
+      const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
+      const layout = ymaps.templateLayoutFactory.createClass(
+        `<div class="yandex-price-pin ${active ? '' : 'muted'}">${amount} млн ₽</div>`
+      )
+      const placemark = new ymaps.Placemark(
+        [point.lat,point.lon],
+        {
+          hintContent:escapeHtml(item.title),
+          balloonContentHeader:escapeHtml(item.title),
+          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+        },
+        {
+          iconLayout:layout,
+          iconShape:{ type:'Rectangle', coordinates:[[-52,-34],[52,0]] },
+          zIndex:500
+        }
+      )
+      instance.geoObjects.add(placemark)
     }
-  },[items,selectedDistrict])
-  return <div className="map-wrapper"><div ref={element} className="map-canvas" aria-label="Карта квартир Красноярска"/><div className="map-legend"><span><i className="legend-dot blue"/> Квартиры</span><span><i className="legend-dot green"/> Районы</span></div></div>
+
+    const compactDistricts = zoom >= 13
+    for (const [district,houses] of groups) {
+      const points = houses.map(home => validCoordinate(home.latitude,home.longitude)).filter((point):point is { lat:number; lon:number } => point !== null)
+      if (!points.length) continue
+      const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
+      const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
+      const scores = houses.map(home => score10(home.recommendation.score)).filter((value):value is number => value !== null)
+      const average = scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
+      const active = selectedDistrict === district
+
+      const html = compactDistricts
+        ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
+        : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span>${average === null ? '' : `<b>${average.toFixed(1)}</b>`}</div>`
+      const layout = ymaps.templateLayoutFactory.createClass(html)
+      const placemark = new ymaps.Placemark(
+        [lat,lon],
+        { hintContent:escapeHtml(district) },
+        {
+          iconLayout:layout,
+          iconShape:compactDistricts
+            ? { type:'Circle', coordinates:[0,0], radius:11 }
+            : { type:'Rectangle', coordinates:[[-62,-62],[62,0]] },
+          zIndex:1000
+        }
+      )
+      placemark.events.add('click', () => districtHandler.current(district))
+      instance.geoObjects.add(placemark)
+    }
+
+    if (workLocation) {
+      const point = validCoordinate(workLocation.lat,workLocation.lon)
+      if (point) {
+        const workPlacemark = new ymaps.Placemark(
+          [point.lat,point.lon],
+          { iconCaption:'Работа', hintContent:'Место работы', balloonContent:'Выбранное место работы' },
+          { preset:'islands#redIcon', draggable:true, zIndex:1500 }
+        )
+        workPlacemark.events.add('dragend', () => {
+          const coords = workPlacemark.geometry.getCoordinates()
+          const next = validCoordinate(coords?.[0],coords?.[1])
+          if (next) workHandler.current(next)
+        })
+        instance.geoObjects.add(workPlacemark)
+      }
+    }
+  },[items,selectedDistrict,workLocation,workPicking,ready,zoom])
+
+  return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
+    <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
+    {loadError && <div className="map-load-error"><b>Яндекс Карта недоступна</b><span>{loadError}</span><small>Проверьте VITE_YANDEX_MAPS_API_KEY и доступ к api-maps.yandex.ru.</small></div>}
+    {workPicking && <div className="work-pick-hint">Нажмите на карте в точке, где находится работа</div>}
+    <div className="map-legend"><span><i className="legend-dot blue"/> Квартиры</span><span><i className="legend-dot green"/> Районы</span><span><i className="legend-dot red"/> Работа</span></div>
+  </div>
 }
