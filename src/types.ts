@@ -29,7 +29,7 @@ export interface Apartment {
 export interface ListingInput { title: string; address: string; price: number; area: number; rooms: number; floor: number; total_floors: number; description: string; kitchen_area?: number; renovation?: string }
 export interface User { id: string; login: string }
 export type CatalogSort = 'recommended' | 'price_asc' | 'price_desc' | 'area_desc'
-export interface CatalogFilters { district: string; maxPrice: number; rooms: number; query: string; sort: CatalogSort }
+export interface CatalogFilters { district: string; maxPrice: number; rooms: number; minArea: number; yearFrom: number; buildingType: string; onlyWithPhotos: boolean; query: string; sort: CatalogSort }
 
 export interface RecommendationRequest {
   budget_max: number
