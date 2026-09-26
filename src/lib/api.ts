@@ -238,6 +238,10 @@ export const api = {
     const leadUserId=leadId.replace(/^user:/,'')
     await request<void>(`/api/pro/leads/${encodeURIComponent(leadUserId)}/stage`,{method:'PUT',body:JSON.stringify({apartment_id:Number(apartmentId),stage})})
   },
+  async promotion(apartmentId:string): Promise<{apartment_id:number;status:string;starts_at:string;ends_at:string}|null> {
+    if (isDemo) return null
+    return request<{apartment_id:number;status:string;starts_at:string;ends_at:string}|null>(`/api/pro/promotions/${encodeURIComponent(apartmentId)}`)
+  },
   async promote(apartmentId:string,days=7): Promise<void> {
     if (isDemo) return
     await request(`/api/pro/promotions/${encodeURIComponent(apartmentId)}`,{method:'POST',body:JSON.stringify({days})})
