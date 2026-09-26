@@ -1145,3 +1145,17 @@ img,svg,canvas{max-width:100%}
     transition-duration:.001ms!important;
   }
 }
+
+
+/* Keyboard/focus states kept visible after the mobile pass. */
+:where(a,button,input,select,textarea):focus-visible{
+  outline:3px solid #78b5ff;
+  outline-offset:2px;
+}
+:where(button,input,select,textarea):disabled{cursor:not-allowed}
+
+/* Prevent long untrusted/source text from widening layouts. */
+:where(.card-address,.source-card,.project-copy,.account-item-copy,.pro-lead-main,.saved-search-copy,.report-candidate-main){
+  min-width:0;
+  overflow-wrap:anywhere;
+}
