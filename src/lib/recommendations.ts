@@ -59,6 +59,12 @@ export function normalizeRecommendation(raw: {
       predicted_price_m2:nullableNumber(item.predicted_price_m2),
       score:numberOr(item.score,0),
       scores:Object.fromEntries(keys.map(key => [key,nullableNumber(item.scores?.[key])])) as RecommendationItem['scores'],
+      contributions:item.contributions
+        ? Object.fromEntries(keys.flatMap(key => {
+            const value = nullableNumber(item.contributions?.[key])
+            return value === null ? [] : [[key,value]]
+          })) as RecommendationItem['contributions']
+        : undefined,
       commute_minutes:nullableNumber(item.commute_minutes),
       reasons:textList(item.reasons),
       warnings:textList(item.warnings),
@@ -82,7 +88,11 @@ export function demoRecommend(input: RecommendationRequest): RecommendationRespo
     const parkWeight = input.priorities.parks
     const transportWeight = input.priorities.transport
     const weightTotal = schoolWeight + parkWeight + transportWeight + 1
-    const score = round((schools * schoolWeight + parks * parkWeight + transport * transportWeight + affordability) / weightTotal)
+    const schoolContribution = schools * schoolWeight / weightTotal
+    const parkContribution = parks * parkWeight / weightTotal
+    const transportContribution = transport * transportWeight / weightTotal
+    const priceContribution = affordability / weightTotal
+    const score = round(schoolContribution + parkContribution + transportContribution + priceContribution)
     return {
       apartment_id:home.id,
       title:home.title,
@@ -91,6 +101,12 @@ export function demoRecommend(input: RecommendationRequest): RecommendationRespo
       predicted_price_m2:null,
       score,
       scores:{ schools, parks, transport, ecology:null, safety:null, commute:null, price:affordability },
+      contributions:{
+        schools:round(schoolContribution),
+        parks:round(parkContribution),
+        transport:round(transportContribution),
+        price:round(priceContribution)
+      },
       commute_minutes:null,
       reasons:[`${f.schools_1km} школы рядом (до 1 км)`, `Парк в ${f.nearest_park_m} м`, `Транспорт в ${f.nearest_transport_m} м`],
       warnings:[],
