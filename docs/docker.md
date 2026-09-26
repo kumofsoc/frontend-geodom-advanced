@@ -26,6 +26,14 @@ Change the host port with `GEODOM_FRONTEND_PORT`.
 
 Run `npm run media:manifest` before the Docker build when using the temporary local-media bridge. The actual files under `public/media` are bind-mounted read-only by Compose, so hundreds of apartment photos do not become layers inside every frontend image rebuild.
 
-## Backend integration later
+## Backend integration
 
-This compose file intentionally contains only the frontend today. When the Go service is added, prefer same-origin reverse proxying through Nginx rather than baking a container hostname into browser JavaScript. At that point add a `backend` service and proxy a stable prefix such as `/backend/` to the Go container.
+The frontend Compose stack remains a separate repository, but now defaults to the local GeoDom Go API:
+
+```text
+VITE_API_URL=http://localhost:8080
+```
+
+That value is baked into the Vite bundle and is correct for a browser running on the same developer machine. The Go backend CORS configuration allows both the Vite dev origin on port 5173 and the Docker/Nginx frontend on port 3000.
+
+To force demo mode for a Docker build, explicitly set an empty `VITE_API_URL` build argument. For a later single-origin production deployment, prefer Nginx/ingress reverse proxying instead of cross-origin browser requests.
