@@ -54,7 +54,8 @@ export function MapPanel({
   workLocation,
   workPicking,
   onWorkLocation,
-  activeApartmentIds
+  activeApartmentIds,
+  scoreByApartment
 }:{
   items:Apartment[]
   geoObjects:GeoObject[]
@@ -64,6 +65,7 @@ export function MapPanel({
   workPicking:boolean
   onWorkLocation:(location:{ lat:number; lon:number })=>void
   activeApartmentIds?:Set<string>
+  scoreByApartment?:Map<string,number>
 }) {
   const element = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
@@ -186,6 +188,10 @@ export function MapPanel({
       const active = activeByFilter && activeByDistrict
       const compactApartment = zoom < APARTMENT_PRICE_MIN_ZOOM
       const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
+      const personalScore = scoreByApartment?.get(String(item.id))
+      const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
+        ? personalScore
+        : score10(item.recommendation.score)
       const layout = ymaps.templateLayoutFactory.createClass(
         compactApartment
           ? `<div class="yandex-apartment-dot ${active ? '' : 'muted'}"></div>`
@@ -195,7 +201,7 @@ export function MapPanel({
         [point.lat,point.lon],
         {
           balloonContentHeader:escapeHtml(item.title),
-          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
         },
         compactApartment
           ? {
@@ -227,7 +233,10 @@ export function MapPanel({
 
       const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
       const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
-      const scores = houses.map(home => score10(home.recommendation.score)).filter((value):value is number => value !== null)
+      const scores = houses.map(home => {
+        const personal = scoreByApartment?.get(String(home.id))
+        return typeof personal === 'number' && Number.isFinite(personal) ? personal : score10(home.recommendation.score)
+      }).filter((value):value is number => value !== null)
       const average = scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
       const active = selectedDistrict === district
       const html = compactDistricts
@@ -312,7 +321,7 @@ export function MapPanel({
         instance.geoObjects.add(workPlacemark)
       }
     }
-  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds,layers])
+  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds,scoreByApartment,layers])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
