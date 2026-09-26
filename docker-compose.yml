@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        VITE_DATA_MODE: ${VITE_DATA_MODE:-demo}
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
         VITE_API_REQUEST_TIMEOUT_MS: ${VITE_API_REQUEST_TIMEOUT_MS:-15000}
         VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
