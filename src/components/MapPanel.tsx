@@ -201,16 +201,18 @@ export function MapPanel({
           ? {
               iconLayout:layout,
               iconShape:{ type:'Circle',coordinates:[0,0],radius:6 },
+              interactiveZIndex:false,
               zIndex:480,
-              zIndexHover:500,
-              zIndexActive:520
+              zIndexHover:480,
+              zIndexActive:500
             }
           : {
               iconLayout:layout,
               iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
+              interactiveZIndex:false,
               zIndex:900,
-              zIndexHover:930,
-              zIndexActive:960
+              zIndexHover:900,
+              zIndexActive:920
             }
       )
       instance.geoObjects.add(placemark)
@@ -241,9 +243,10 @@ export function MapPanel({
           iconShape:compactDistricts
             ? { type:'Circle',coordinates:[0,0],radius:11 }
             : { type:'Rectangle',coordinates:[[-62,-62],[62,0]] },
+          interactiveZIndex:false,
           zIndex:compactDistricts ? 620 : 1050,
-          zIndexHover:compactDistricts ? 640 : 1070,
-          zIndexActive:compactDistricts ? 660 : 1090
+          zIndexHover:compactDistricts ? 620 : 1050,
+          zIndexActive:compactDistricts ? 640 : 1070
         }
       )
       placemark.events.add('click', () => {
