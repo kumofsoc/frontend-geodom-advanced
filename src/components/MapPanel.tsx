@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, Layers3 } from 'lucide-react'
 import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
 import { validCoordinate, type GeoObject } from '../lib/dataSanitizers'
@@ -78,6 +79,7 @@ export function MapPanel({
   const [ready,setReady] = useState(false)
   const [zoom,setZoom] = useState(11)
   const [loadError,setLoadError] = useState('')
+  const [layersOpen,setLayersOpen] = useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
   const [layers,setLayers] = useState<Record<PoiLayer,boolean>>({
     education:true,
     parks:true,
@@ -328,21 +330,25 @@ export function MapPanel({
     {loadError && <div className="map-load-error"><b>Яндекс Карта недоступна</b><span>{loadError}</span><small>Проверьте VITE_YANDEX_MAPS_API_KEY и доступ к api-maps.yandex.ru.</small></div>}
     {workPicking && <div className="work-pick-hint">Нажмите на карте в точке, где находится работа</div>}
 
-    <div className="map-layer-panel" aria-label="Слои инфраструктуры">
-      <div className="map-layer-title"><b>Слои на карте</b><small>{validApartmentCount} квартир · {geoObjects.length} POI</small></div>
-      <div className="map-lod-status">{zoom <= DISTRICT_CARD_MAX_ZOOM ? 'Обзор районов · приблизьте для цен квартир' : 'Цены квартир · районы показаны точками'}</div>
-      {layerMeta.map(layer => <button
-        type="button"
-        key={layer.key}
-        className={layers[layer.key] ? 'active' : ''}
-        onClick={() => setLayers(current => ({ ...current,[layer.key]:!current[layer.key] }))}
-        aria-pressed={layers[layer.key]}
-      >
-        <i className={`poi-dot ${layer.key}`}/>
-        <span>{layer.label}</span>
-        <small>{layerCounts[layer.key]}</small>
-      </button>)}
-      {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
+    <div className={`map-layer-panel ${layersOpen ? 'open' : 'collapsed'}`} aria-label="Слои инфраструктуры">
+      <button type="button" className="map-layer-toggle" onClick={() => setLayersOpen(value => !value)} aria-expanded={layersOpen}>
+        <Layers3 size={15}/><b>Слои на карте</b><small>{validApartmentCount} кв. · {geoObjects.length} POI</small><ChevronDown size={14}/>
+      </button>
+      {layersOpen && <>
+        <div className="map-lod-status">{zoom <= DISTRICT_CARD_MAX_ZOOM ? 'Обзор районов · приблизьте для цен квартир' : 'Цены квартир · районы показаны точками'}</div>
+        {layerMeta.map(layer => <button
+          type="button"
+          key={layer.key}
+          className={layers[layer.key] ? 'active' : ''}
+          onClick={() => setLayers(current => ({ ...current,[layer.key]:!current[layer.key] }))}
+          aria-pressed={layers[layer.key]}
+        >
+          <i className={`poi-dot ${layer.key}`}/>
+          <span>{layer.label}</span>
+          <small>{layerCounts[layer.key]}</small>
+        </button>)}
+        {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
+      </>}
     </div>
 
     <div className="map-legend">
