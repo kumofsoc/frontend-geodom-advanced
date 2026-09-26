@@ -679,3 +679,469 @@
   .mortgage-final-actions{grid-template-columns:minmax(0,1fr)}
   .mortgage-wizard-actions{align-items:stretch;flex-direction:column-reverse}.mortgage-wizard-actions.end{align-items:stretch}.mortgage-wizard-primary,.mortgage-wizard-secondary{width:100%}
 }
+
+
+/* =========================================================
+   MVP mobile / tablet production pass
+   Final overrides intentionally live at the end of the file.
+   ========================================================= */
+html,body,#root,.app{max-width:100%}
+html{overflow-x:hidden}
+body{overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button,a{touch-action:manipulation}
+img,svg,canvas{max-width:100%}
+:where(.dashboard-main,.detail-content,.detail-aside,.pro-workspace,.account-page,.form-page,.report-page,.district-explorer-page){min-width:0}
+
+/* Header behaves like a proper mobile shell. */
+@media(max-width:760px){
+  .site-header{
+    position:sticky;
+    top:0;
+    z-index:1200;
+    height:64px;
+    padding-top:env(safe-area-inset-top);
+    background:#fffffff7;
+    backdrop-filter:blur(16px);
+  }
+  .header-inner{height:64px}
+  .brand{gap:9px}
+  .brand-symbol{width:38px;height:38px;border-radius:10px}
+  .brand-symbol svg{width:21px;height:21px}
+  .brand-name{font-size:19px;letter-spacing:-.7px}
+  .brand-label{font-size:8px;margin-top:3px}
+  .mobile-menu{width:44px;height:44px;border-radius:10px;flex:none}
+  .mobile-panel-backdrop{
+    display:block;
+    position:fixed;
+    z-index:1170;
+    inset:calc(64px + env(safe-area-inset-top)) 0 0;
+    border:0;
+    background:#071b396b;
+    backdrop-filter:blur(2px);
+  }
+  .mobile-panel{
+    display:flex;
+    flex-direction:column;
+    position:fixed;
+    z-index:1180;
+    top:calc(64px + env(safe-area-inset-top));
+    right:0;
+    bottom:0;
+    left:auto;
+    width:min(390px,92vw);
+    max-height:calc(100dvh - 64px - env(safe-area-inset-top));
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    padding:12px 12px calc(16px + env(safe-area-inset-bottom));
+    background:#fff;
+    border-left:1px solid #e3eaf1;
+    box-shadow:-18px 0 50px #102d5033;
+  }
+  .mobile-panel-primary{display:grid;gap:3px}
+  .mobile-panel-primary>a{
+    min-height:46px;
+    display:flex;
+    align-items:center;
+    padding:0 12px;
+    border:0;
+    border-radius:9px;
+    color:#29445d;
+    font-size:14px;
+    font-weight:800;
+  }
+  .mobile-panel-primary>a:hover{background:#f1f6fb;color:#1673d7}
+  .mobile-panel-actions{display:grid;gap:8px;margin-top:auto;padding-top:18px}
+  .mobile-panel-actions>a{
+    min-height:46px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:900;
+  }
+  .mobile-panel-post{background:#102d50;color:#fff}
+  .mobile-panel-account{border:1px solid #dce7ef;background:#f7fafc;color:#245274}
+  .demo-banner{padding:7px 0;font-size:8px}
+}
+
+/* Global content gutters and touch-friendly controls. */
+@media(max-width:900px){
+  .shell{width:calc(100% - 32px)}
+}
+@media(max-width:760px){
+  .shell{width:calc(100% - 24px)}
+  :where(input:not([type=range]),select,textarea){font-size:16px!important}
+  :where(.button,.share-button,.small-action,.mobile-filter-button,.save-search-button,.report-link,.compare-page-cta){min-height:44px}
+  :where(.dashboard-search button,.sidebar-apply,.room-options button){min-height:44px}
+}
+@media(max-width:380px){
+  .shell{width:calc(100% - 16px)}
+}
+
+/* Home/catalog: avoid cramped desktop controls and give map/cards real phone space. */
+@media(max-width:760px){
+  .dashboard-page{padding-bottom:34px}
+  .dashboard-intro{display:block;padding:18px 0 12px}
+  .dashboard-intro h1{font-size:clamp(24px,8vw,31px);line-height:1.13}
+  .dashboard-intro p{font-size:12px;line-height:1.6}
+  .dashboard-search{
+    height:auto;
+    min-height:50px;
+    padding:6px 6px 6px 12px;
+    border-radius:11px;
+  }
+  .dashboard-search button{min-width:44px;padding:0 12px}
+  .map-panel{padding:7px;border-radius:12px}
+  .map-topbar{height:auto;min-height:42px;flex-wrap:wrap;padding:4px}
+  .map-topbar>div{min-width:0}
+  .map-tab{padding:8px;font-size:10px}
+  .map-wrapper{height:clamp(300px,55dvh,410px);min-height:300px}
+  .map-caption{align-items:flex-start;line-height:1.4}
+  .dashboard-section-title{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:8px;
+    margin-top:22px;
+  }
+  .dashboard-section-title>div{min-width:0}
+  .dashboard-section-title h2{font-size:20px}
+  .dashboard-section-title p{font-size:11px;line-height:1.45}
+  .listings-actions{
+    width:100%;
+    flex-wrap:wrap;
+    justify-content:flex-start;
+    gap:7px;
+  }
+  .listings-actions .save-search-button,
+  .listings-actions .mobile-filter-button{
+    flex:1 1 auto;
+    justify-content:center;
+  }
+  .select-wrap{min-width:0}
+  .select-wrap select{max-width:100%}
+  .catalog-filter-chips{overflow-x:auto;flex-wrap:nowrap!important;padding-bottom:4px;scrollbar-width:none}
+  .catalog-filter-chips::-webkit-scrollbar{display:none}
+  .catalog-filter-chip{flex:none}
+  .dashboard-end{align-items:flex-start}
+  .home-card:hover,.district-card:hover,.recommendation-card:hover{transform:none}
+}
+@media(max-width:520px){
+  .home-card{border-radius:12px}
+  .home-card-image{height:clamp(190px,52vw,235px)}
+  .home-card-info{padding:13px}
+  .card-price{font-size:18px}
+  .home-card h3{font-size:13px;line-height:1.35}
+  .card-address{font-size:10px}
+  .card-bottom{font-size:10px}
+  .card-match{font-size:10px}
+  .card-source-link{min-height:42px;font-size:10px}
+  .recommendation-card{
+    display:block;
+  }
+  .recommendation-cover{height:190px;min-height:0}
+  .recommendation-body{padding:12px}
+  .recommendation-title{font-size:13px}
+  .recommendation-actions button{min-height:40px;font-size:10px}
+}
+
+/* Filters become a real mobile sheet instead of a narrow fixed desktop sidebar. */
+@media(max-width:760px){
+  .dashboard-sidebar{
+    inset:0!important;
+    width:min(430px,100vw);
+    max-width:100vw;
+    height:100dvh;
+    max-height:100dvh!important;
+    padding:calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    border:0;
+    border-radius:0;
+    box-shadow:20vw 0 0 80vw #071b3980;
+    overscroll-behavior:contain;
+  }
+  .sidebar-heading{
+    position:sticky;
+    top:calc(-18px - env(safe-area-inset-top));
+    z-index:3;
+    margin:calc(-18px - env(safe-area-inset-top)) -16px 16px;
+    padding:calc(16px + env(safe-area-inset-top)) 16px 12px;
+    background:#fff;
+    border-bottom:1px solid #e8eef4;
+  }
+  .sidebar-heading h2{font-size:18px}
+  .sidebar-label{font-size:13px}
+  .preferences-sidebar input[type=number],.preferences-sidebar select{height:46px}
+  .priority-slider>span,.family-grid label{font-size:12px}
+  .sidebar-apply{height:48px;font-size:13px}
+}
+
+/* Detail page: actions wrap, gallery scales, score moves below content cleanly. */
+@media(max-width:900px){
+  .detail-layout{gap:16px}
+}
+@media(max-width:760px){
+  .detail-page{padding-top:14px}
+  .detail-top{align-items:flex-start;gap:10px;flex-direction:column}
+  .detail-top-right{
+    width:100%;
+    gap:6px;
+    overflow-x:auto;
+    padding-bottom:4px;
+    scrollbar-width:none;
+  }
+  .detail-top-right::-webkit-scrollbar{display:none}
+  .detail-top-right .share-button{
+    flex:none;
+    min-height:40px;
+    padding:0 10px;
+    border:1px solid #dce6ef;
+    border-radius:8px;
+    background:#fff;
+    font-size:10px;
+  }
+  .detail-heading{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:18px 0}
+  .detail-heading h1{font-size:clamp(27px,9vw,39px);margin:8px 0 9px}
+  .detail-heading p{font-size:12px;line-height:1.45}
+  .detail-heading-price{text-align:left;white-space:normal;margin:0}
+  .detail-heading-price b{font-size:27px}
+  .gallery{height:clamp(270px,68vw,390px)}
+  .detail-layout{display:flex;flex-direction:column;margin-top:20px}
+  .detail-content{width:100%;padding:0 18px;border-radius:12px}
+  .detail-aside{width:100%;display:grid;grid-template-columns:1fr;gap:10px}
+  .score-panel,.aside-note{width:100%}
+  .detail-section{padding:25px 0}
+  .detail-section h2{font-size:22px;line-height:1.2}
+  .description,.section-intro{font-size:12px;line-height:1.65}
+  .spec-grid,.infra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .spec-grid>div,.infra-grid>div{min-width:0}
+  .project{align-items:flex-start}
+  .source-card{min-width:0}
+  .finance-tools{gap:14px}
+}
+@media(max-width:480px){
+  .detail-content{padding:0 13px}
+  .gallery{height:260px;border-radius:10px}
+  .gallery-arrow{width:42px;height:42px}
+  .gallery-counter{left:10px;bottom:10px}
+  .spec-grid,.infra-grid{gap:6px}
+  .spec-grid>div,.infra-grid>div{padding:12px 10px}
+  .secondary-specs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .project{padding:12px}
+}
+
+/* Compare remains horizontally scrollable, but the first label column stays useful. */
+@media(max-width:760px){
+  .compare-page-toolbar{flex-wrap:wrap}
+  .compare-page-head{display:block}
+  .compare-scroll{
+    margin-left:-12px;
+    margin-right:-12px;
+    padding-left:12px;
+    padding-right:12px;
+    scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+  }
+  .compare-matrix{grid-template-columns:112px repeat(var(--compare-count),minmax(205px,1fr))}
+  .compare-label-cell,.compare-sticky-label{
+    position:sticky;
+    left:0;
+    z-index:4;
+    box-shadow:4px 0 8px #15395d0d;
+  }
+  .compare-object-card,.compare-value-cell{scroll-snap-align:start}
+  .compare-page-note{font-size:9px}
+}
+
+/* Report: don't crush the comparison matrix into unreadable 54px cells. */
+@media(max-width:600px){
+  .report-toolbar{flex-wrap:wrap}
+  .report-header{padding:20px;border-radius:13px}
+  .report-header h1{font-size:30px}
+  .report-parameters{grid-template-columns:1fr 1fr}
+  .report-factor-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .report-factor-row{min-width:500px}
+  .report-section-head{align-items:flex-start;gap:6px;flex-direction:column}
+}
+
+/* Account: stop turning actions into invisible icon-only controls on phones. */
+@media(max-width:640px){
+  .account-page,.form-page{padding-top:16px;padding-bottom:38px}
+  .account-hero{
+    min-height:0;
+    padding:20px;
+    align-items:flex-start;
+    gap:18px;
+  }
+  .account-hero h1{font-size:25px}
+  .account-hero p{font-size:11px;line-height:1.55}
+  .account-avatar{width:56px;height:56px;font-size:26px;flex:none}
+  .account-heading{align-items:flex-start;gap:12px;flex-wrap:wrap;margin:26px 0 12px}
+  .account-heading h2{font-size:20px}
+  .account-heading .button{
+    width:auto!important;
+    min-width:44px;
+    padding:0 12px!important;
+    font-size:11px!important;
+  }
+  .account-item{
+    display:grid;
+    grid-template-columns:92px minmax(0,1fr);
+    gap:10px;
+    align-items:start;
+    padding:10px;
+  }
+  .account-item-image{width:92px;height:82px}
+  .account-item-copy{min-width:0}
+  .account-item-copy h3{font-size:12px!important;line-height:1.35}
+  .account-item-actions{
+    grid-column:1/-1;
+    display:flex;
+    min-width:0;
+    gap:7px;
+    border-top:1px solid #edf2f6;
+    padding-top:8px;
+  }
+  .small-action{
+    flex:1;
+    justify-content:center!important;
+    min-height:40px;
+    padding:0 8px;
+    border:1px solid #e1e9f1;
+    border-radius:7px;
+    background:#f8fbfe;
+    font-size:10px!important;
+  }
+  .small-action svg{width:15px!important}
+  .account-pro-card{grid-template-columns:40px minmax(0,1fr);padding:13px}
+  .account-pro-card>svg{display:none}
+  .demand-share-panel,.saved-searches-panel{padding:13px}
+  .demand-share-head,.saved-searches-head{grid-template-columns:38px minmax(0,1fr)}
+  .demand-share-status,.saved-searches-head>b{grid-column:2;justify-self:start}
+  .demand-share-head h2,.saved-searches-head h2{font-size:16px}
+  .demand-share-head p,.saved-searches-head p{font-size:10px}
+  .demand-share-snapshot{grid-template-columns:1fr 1fr}
+  .demand-share-snapshot span{font-size:8px}.demand-share-snapshot b{font-size:10px}
+  .demand-share-form{grid-template-columns:1fr}
+  .demand-consent b{font-size:10px}.demand-consent small{font-size:9px}
+  .demand-share-actions .button,.demand-delete{min-height:42px}
+  .saved-search-list article{grid-template-columns:34px minmax(0,1fr)}
+  .saved-search-copy h3{font-size:11px}
+  .saved-search-copy p{font-size:9px}
+  .saved-search-copy small{font-size:8px}
+  .saved-search-actions{grid-column:1/-1;width:100%}
+  .saved-search-actions button{min-height:40px;font-size:9px}
+}
+
+/* Listing/auth forms: one-column, readable labels, no iOS auto-zoom. */
+@media(max-width:760px){
+  .auth-form-side{padding:28px 18px}
+  .auth-card,.form-section{max-width:100%}
+  .listing-form{display:block}
+  .form-heading{margin-bottom:20px}
+  .form-heading h1{font-size:clamp(28px,9vw,36px);line-height:1.08}
+  .form-heading p{font-size:12px;line-height:1.6}
+  .form-section{padding:16px;border-radius:11px}
+  .form-grid,.form-fields{grid-template-columns:1fr!important}
+  .form-field{min-width:0}
+  .form-field label{font-size:12px!important}
+  .form-field input,.form-field select,.form-field textarea{width:100%;min-width:0;min-height:46px}
+  .form-submit-row{display:grid;gap:10px}
+  .form-submit-row .button{width:100%;min-height:48px}
+}
+
+/* Pro workspace: readable CRM cards instead of desktop micro-type. */
+@media(max-width:760px){
+  .pro-page{padding-top:12px;padding-bottom:40px}
+  .pro-hero{padding:20px;border-radius:13px}
+  .pro-hero h1{font-size:30px}
+  .pro-hero p{font-size:11px}
+  .pro-hero-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pro-hero-metrics small{font-size:8px}
+  .pro-tabs{
+    margin-left:-12px;
+    margin-right:-12px;
+    padding:5px 12px;
+    border-left:0;
+    border-right:0;
+    border-radius:0;
+    scroll-snap-type:x proximity;
+  }
+  .pro-tabs button{min-height:42px;font-size:10px;scroll-snap-align:start}
+  .pro-workspace{padding:13px}
+  .pro-section-head{align-items:flex-start;flex-direction:column}
+  .pro-section-head h2{font-size:20px}
+  .pro-section-head p{font-size:10px}
+  .pro-crm-controls{grid-template-columns:1fr}
+  .pro-property-select,.pro-stage-filter{font-size:10px}
+  .pro-property-select select,.pro-stage-filter select{height:46px}
+  .pro-lead-card{
+    grid-template-columns:36px minmax(0,1fr);
+    gap:10px;
+    padding:11px;
+  }
+  .pro-lead-main>p{font-size:10px;line-height:1.45}
+  .pro-lead-main>small,.pro-lead-tags span,.pro-match-reasons span{font-size:8px}
+  .pro-lead-contact{
+    grid-column:1/-1;
+    padding:10px 0 0;
+    border-left:0;
+    border-top:1px solid #e7edf3;
+  }
+  .lead-stage-select{font-size:9px}
+  .lead-stage-select select{height:42px;font-size:16px}
+  .pro-promotion-list article{align-items:flex-start;flex-direction:column}
+  .promotion-actions{width:100%;text-align:left}
+  .promotion-actions button{min-height:42px}
+  .developer-demo-metrics,.analytics-summary,.analytics-columns{grid-template-columns:1fr}
+  .developer-feature-grid{grid-template-columns:1fr}
+}
+
+/* District explorer and misc dense blocks. */
+@media(max-width:620px){
+  .district-explorer-toolbar{align-items:flex-start;flex-wrap:wrap}
+  .district-explorer-head{padding:19px}
+  .district-explorer-head h1{font-size:29px}
+  .district-explorer-head p{font-size:11px}
+  .district-explorer-summary{grid-template-columns:1fr 1fr}
+  .district-affordability{padding:13px}
+  .district-affordability-copy p{font-size:10px}
+  .district-affordability-controls input,.district-affordability-controls select{height:44px}
+  .district-explorer-controls>label{width:100%;justify-content:space-between}
+  .district-explorer-controls .select-wrap{flex:1}
+  .district-explorer-controls .select-wrap select{width:100%;height:44px}
+  .district-explorer-card{padding:14px}
+  .district-metrics{grid-template-columns:1fr 1fr}
+}
+
+/* Footer and overlays respect safe areas. */
+@media(max-width:520px){
+  .site-footer{padding:26px 0 calc(26px + env(safe-area-inset-bottom))}
+  .footer-inner{display:grid;gap:18px}
+  .footer-right{margin:0}
+  .compare-tray{
+    right:8px;
+    bottom:calc(8px + env(safe-area-inset-bottom));
+    width:calc(100vw - 16px);
+    max-height:min(72dvh,560px);
+    overflow:auto;
+  }
+}
+
+/* Phone landscape should not trap the user inside oversized overlays. */
+@media(max-height:520px) and (orientation:landscape){
+  .mobile-panel{width:min(420px,74vw)}
+  .dashboard-sidebar{width:min(430px,76vw);max-width:76vw}
+  .map-wrapper{height:72dvh}
+}
+
+/* Accessibility/performance: respect users who ask for less motion. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+  }
+}
