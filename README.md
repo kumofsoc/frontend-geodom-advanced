@@ -73,7 +73,7 @@ npm run build
 - `src/lib/recommendations.ts` — mock-рекомендация, нормализация API-ответа и хранение локальных демо-событий.
 - `src/data/demo.ts` — явно вымышленные данные для демонстрации интерфейса.
 
-Ипотечное оформление и банковская интеграция не являются ядром MVP, но в карточке квартиры есть локальный аннуитетный калькулятор как инструмент сравнения сценариев. Он не подбирает банк и не является офертой. Аренды, чата, платежей и отдельной админ-панели пока нет.
+В карточке квартиры работает 4-шаговый ипотечный сценарий: выбор программы и банка, параметры заёмщика, стоимость/взнос/срок, затем сравнение рассчитанных предложений. Черновик восстанавливается после reload, а финальные расчёты можно сохранить и увидеть в личном кабинете. Банковские ставки остаются датированным snapshot/ориентиром и не являются офертой или одобрением банка. Аренды, чата, платежей и отдельной админ-панели пока нет.
 
 
 ## Geo parquet и пропуски
@@ -154,6 +154,17 @@ docker compose up -d
 ```
 
 По умолчанию frontend доступен на `http://localhost:3000`, health check — `/healthz`. Временные локальные фото монтируются из `./public/media` read-only и не встраиваются в каждый слой image. Детали и план подключения Go container: `docs/docker.md`.
+
+Для production используйте строгий compose-профиль, который не позволит случайно собрать публичный frontend без API URL и Yandex Maps browser key:
+
+```bash
+cp .env.production.example .env.production
+# заполнить реальные VITE_API_URL и VITE_YANDEX_MAPS_API_KEY
+docker compose --env-file .env.production -f docker-compose.prod.yml build
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+CI дополнительно запускает собранный nginx image, проверяет `/healthz`, SPA fallback для прямых маршрутов и обязательные security headers.
 
 
 ## Finance and GeoDom Pro
