@@ -26,6 +26,8 @@ describe('demo recommendation gateway', () => {
     expect(rank(parks.items, 'a3')).toBeLessThan(rank(parks.items, 'a1'))
     expect(parks.items[0].scores.ecology).toBeNull()
     expect(parks.items[0].predicted_price_m2).toBeNull()
+    const contributionSum = Object.values(parks.items[0].contributions || {}).reduce((sum,value) => sum+(value || 0),0)
+    expect(contributionSum).toBeCloseTo(parks.items[0].score,1)
     expect(parks.warnings.join(' ')).toMatch(/экологии|безопасности/)
   })
   it('reports missing route data when a workplace is provided', () => {
