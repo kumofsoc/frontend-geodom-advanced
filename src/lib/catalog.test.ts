@@ -45,7 +45,12 @@ describe('catalog filters',() => {
 
 describe('listing validation',() => {
   it('rejects impossible area and floor',() => {
-    expect(validateApartment({ title:'Студия',address:'Ленина, 25',price:5000000,area:0,rooms:1,floor:12,total_floors:9,description:'Описание' })).toContain('Площадь должна быть больше нуля')
-    expect(validateApartment({ title:'Студия',address:'Ленина, 25',price:5000000,area:32,rooms:1,floor:12,total_floors:9,description:'Описание' })).toContain('Этаж не может превышать этажность дома')
+    expect(validateApartment({ title:'Студия',address:'Ленина, 25',district_name:'Центральный',price:5000000,area:0,rooms:1,floor:12,total_floors:9,description:'Описание' })).toContain('Площадь должна быть больше нуля')
+    expect(validateApartment({ title:'Студия',address:'Ленина, 25',district_name:'Центральный',price:5000000,area:32,rooms:1,floor:12,total_floors:9,description:'Описание' })).toContain('Этаж не может превышать этажность дома')
+  })
+
+  it('accepts only one of the seven Krasnoyarsk districts',() => {
+    expect(validateApartment({ title:'Студия',address:'Ленина, 25',district_name:'',price:5000000,area:32,rooms:1,floor:3,total_floors:9,description:'' })).toContain('Выберите один из 7 районов Красноярска')
+    expect(validateApartment({ title:'Студия',address:'Ленина, 25',district_name:'Советский',price:5000000,area:32,rooms:1,floor:3,total_floors:9,description:'' })).not.toContain('Выберите один из 7 районов Красноярска')
   })
 })
