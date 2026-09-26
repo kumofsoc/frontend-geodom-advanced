@@ -181,30 +181,39 @@ export function MapPanel({
       if (!point) continue
       groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
 
-      if (zoom >= APARTMENT_PRICE_MIN_ZOOM) {
-        const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
-        const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
-        const active = activeByFilter && activeByDistrict
-        const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
-        const layout = ymaps.templateLayoutFactory.createClass(
-          `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
-        )
-        const placemark = new ymaps.Placemark(
-          [point.lat,point.lon],
-          {
-            balloonContentHeader:escapeHtml(item.title),
-            balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
-          },
-          {
-            iconLayout:layout,
-            iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
-            zIndex:900,
-            zIndexHover:930,
-            zIndexActive:960
-          }
-        )
-        instance.geoObjects.add(placemark)
-      }
+      const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
+      const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
+      const active = activeByFilter && activeByDistrict
+      const compactApartment = zoom < APARTMENT_PRICE_MIN_ZOOM
+      const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
+      const layout = ymaps.templateLayoutFactory.createClass(
+        compactApartment
+          ? `<div class="yandex-apartment-dot ${active ? '' : 'muted'}"></div>`
+          : `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
+      )
+      const placemark = new ymaps.Placemark(
+        [point.lat,point.lon],
+        {
+          balloonContentHeader:escapeHtml(item.title),
+          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+        },
+        compactApartment
+          ? {
+              iconLayout:layout,
+              iconShape:{ type:'Circle',coordinates:[0,0],radius:6 },
+              zIndex:480,
+              zIndexHover:500,
+              zIndexActive:520
+            }
+          : {
+              iconLayout:layout,
+              iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
+              zIndex:900,
+              zIndexHover:930,
+              zIndexActive:960
+            }
+      )
+      instance.geoObjects.add(placemark)
     }
 
     const compactDistricts = zoom > DISTRICT_CARD_MAX_ZOOM
