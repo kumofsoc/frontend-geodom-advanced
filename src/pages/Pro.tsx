@@ -3,7 +3,8 @@ import { BadgeCheck, BarChart3, Building2, Check, Crown, LockKeyhole, Megaphone,
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
-import { DEMO_PRO_LEADS,leadAnalytics,loadPromotedIds,matchLeadToApartment,savePromotedIds,type ProLead } from '../lib/pro'
+import { DEMO_PRO_LEADS,leadAnalytics,loadLeadPipeline,loadPromotedIds,matchLeadToApartment,savePromotedIds,setLeadStage,type LeadStage,type ProLead } from '../lib/pro'
+import { loadSharedDemandProfile,sharedDemandProfileToLead } from '../lib/demandProfile'
 import { EmptyState,PageLoading } from '../components/Ui'
 import type { Apartment } from '../types'
 
@@ -17,6 +18,12 @@ export function Pro() {
   const [selectedId,setSelectedId]=useState('')
   const [promoted,setPromoted]=useState<string[]>(loadPromotedIds)
   const [unlocked,setUnlocked]=useState<string[]>([])
+  const [pipeline,setPipeline]=useState<Record<string,LeadStage>>(loadLeadPipeline)
+  const [stageFilter,setStageFilter]=useState<'all'|LeadStage>('all')
+  const sharedProfile=useMemo(() => loadSharedDemandProfile(),[])
+  const crmLeads=useMemo(() => sharedProfile?.consentToContact
+    ? [sharedDemandProfileToLead(sharedProfile),...DEMO_PRO_LEADS]
+    : DEMO_PRO_LEADS,[sharedProfile])
 
   useEffect(() => {
     api.mine()
@@ -30,11 +37,12 @@ export function Pro() {
 
   const selected=mine.find(item => item.id === selectedId) ?? mine[0] ?? null
   const matches=useMemo(() => selected
-    ? DEMO_PRO_LEADS
+    ? crmLeads
         .map(lead => matchLeadToApartment(lead,selected))
         .filter(match => match.lead.intent === 'buy')
+        .filter(match => stageFilter === 'all' || (pipeline[match.lead.id] || 'new') === stageFilter)
         .sort((a,b) => b.score-a.score)
-    : [],[selected])
+    : [],[selected,crmLeads,stageFilter,pipeline])
   const analytics=useMemo(() => leadAnalytics(DEMO_PRO_LEADS),[])
 
   function togglePromotion(id:string) {
@@ -48,6 +56,16 @@ export function Pro() {
     setUnlocked(current => current.includes(lead.id) ? current : [...current,lead.id])
   }
 
+  function updateStage(leadId:string,stage:LeadStage) {
+    setPipeline(setLeadStage(leadId,stage))
+  }
+
+  const stageCounts=useMemo(() => {
+    const counts:Record<LeadStage,number>={ new:0,contacted:0,viewing:0,won:0,lost:0 }
+    for (const lead of crmLeads.filter(item => item.intent === 'buy')) counts[pipeline[lead.id] || 'new']++
+    return counts
+  },[crmLeads,pipeline])
+
   return <div className="pro-page">
     <div className="shell">
       <header className="pro-hero">
@@ -57,7 +75,7 @@ export function Pro() {
           <p>Рабочий прототип B2B-модели. Здесь нет реальных платежей и реальных пользовательских контактов: лиды ниже синтетические, а контакт открывается только когда у лида стоит согласие.</p>
         </div>
         <div className="pro-hero-metrics">
-          <div><small>Демо-лидов</small><b>{analytics.leads}</b></div>
+          <div><small>CRM-лидов</small><b>{crmLeads.length}</b></div>
           <div><small>Покупка</small><b>{analytics.buyLeads}</b></div>
           <div><small>Аренда</small><b>{analytics.rentLeads}</b></div>
         </div>
@@ -77,25 +95,54 @@ export function Pro() {
         </div>
 
         {loading ? <PageLoading/> : error ? <EmptyState title="CRM недоступна" message={error}/> : !mine.length ? <EmptyState title="Нет своих объявлений" message="Добавьте квартиру, чтобы увидеть matching лидов." action={<Link className="button dark" to="/new">Добавить объявление</Link>}/> : <>
-          <label className="pro-property-select">Объявление
-            <select value={selected?.id || ''} onChange={event => setSelectedId(event.target.value)}>
-              {mine.map(item => <option key={item.id} value={item.id}>{item.title} · {price(item.price)}</option>)}
-            </select>
-          </label>
+          <div className="pro-crm-controls">
+            <label className="pro-property-select">Объявление
+              <select value={selected?.id || ''} onChange={event => setSelectedId(event.target.value)}>
+                {mine.map(item => <option key={item.id} value={item.id}>{item.title} · {price(item.price)}</option>)}
+              </select>
+            </label>
+            <label className="pro-stage-filter">Этап CRM
+              <select value={stageFilter} onChange={event => setStageFilter(event.target.value as 'all'|LeadStage)}>
+                <option value="all">Все лиды</option>
+                <option value="new">Новые · {stageCounts.new}</option>
+                <option value="contacted">Связались · {stageCounts.contacted}</option>
+                <option value="viewing">Просмотр · {stageCounts.viewing}</option>
+                <option value="won">Сделка · {stageCounts.won}</option>
+                <option value="lost">Неактуально · {stageCounts.lost}</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="pro-pipeline-summary">
+            <span><b>{stageCounts.new}</b> новые</span>
+            <span><b>{stageCounts.contacted}</b> связались</span>
+            <span><b>{stageCounts.viewing}</b> просмотр</span>
+            <span><b>{stageCounts.won}</b> сделка</span>
+            <span><b>{stageCounts.lost}</b> неактуально</span>
+          </div>
 
           <div className="pro-leads">
             {matches.map(match => <article key={match.lead.id} className="pro-lead-card">
               <div className="pro-lead-avatar">{match.lead.name.slice(0,1)}</div>
               <div className="pro-lead-main">
-                <div className="pro-lead-title"><h3>{match.lead.name}</h3><span>{match.score}% match</span></div>
-                <p>{match.lead.intent === 'buy' ? `Покупка до ${price(match.lead.budgetMax)}` : `Аренда до ${price(match.lead.monthlyRentMax || 0)}/мес`} · {match.lead.roomsMin}–{match.lead.roomsMax} комн. · {match.lead.districts.join(', ')}</p>
+                <div className="pro-lead-title"><h3>{match.lead.name}</h3><span>{match.score}% match</span>{match.lead.source === 'local' && <em>Согласованный профиль</em>}</div>
+                <p>{match.lead.intent === 'buy' ? `Покупка до ${price(match.lead.budgetMax)}` : `Аренда до ${price(match.lead.monthlyRentMax || 0)}/мес`} · {match.lead.roomsMin}–{match.lead.roomsMax} комн. · {match.lead.districts.length ? match.lead.districts.join(', ') : 'любой район'}</p>
                 <div className="pro-lead-tags">{match.lead.priorities.map(priority => <span key={priority}>{priority}</span>)}</div>
                 <small>Работа: {match.lead.workLabel} · commute до {match.lead.maxCommuteMinutes} мин</small>
                 <div className="pro-match-reasons">{match.reasons.length ? match.reasons.map(reason => <span key={reason}><Check size={11}/>{reason}</span>) : <span>Совпадений по объявлению пока мало</span>}</div>
               </div>
               <div className="pro-lead-contact">
+                <label className="lead-stage-select">Этап
+                  <select value={pipeline[match.lead.id] || 'new'} onChange={event => updateStage(match.lead.id,event.target.value as LeadStage)}>
+                    <option value="new">Новый</option>
+                    <option value="contacted">Связались</option>
+                    <option value="viewing">Просмотр</option>
+                    <option value="won">Сделка</option>
+                    <option value="lost">Неактуально</option>
+                  </select>
+                </label>
                 {!match.lead.consentToContact ? <><LockKeyhole size={18}/><b>Контакт закрыт</b><small>Нет согласия пользователя на передачу контакта</small></>
-                  : unlocked.includes(match.lead.id) ? <><Phone size={18}/><b>{match.lead.contact}</b><small>Демо-контакт · не реальный номер</small></>
+                  : unlocked.includes(match.lead.id) ? <><Phone size={18}/><b>{match.lead.contact}</b><small>{match.lead.source === 'local' ? 'Контакт из согласованного профиля этого браузера' : 'Демо-контакт · не реальный номер'}</small></>
                     : <><LockKeyhole size={18}/><b>Контакт доступен Pro</b><button type="button" onClick={() => unlock(match.lead)}>Открыть контакт</button></>}
               </div>
             </article>)}

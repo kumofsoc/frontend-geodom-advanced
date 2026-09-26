@@ -1,5 +1,6 @@
-import { describe,expect,it } from 'vitest'
-import { DEMO_PRO_LEADS,leadAnalytics,matchLeadToApartment } from './pro'
+// @vitest-environment jsdom
+import { beforeEach,describe,expect,it } from 'vitest'
+import { DEMO_PRO_LEADS,leadAnalytics,loadLeadPipeline,matchLeadToApartment,setLeadStage } from './pro'
 import type { Apartment } from '../types'
 
 const apartment:Apartment={
@@ -10,6 +11,7 @@ const apartment:Apartment={
 }
 
 describe('GeoDom Pro demo',() => {
+  beforeEach(() => localStorage.clear())
   it('matches a qualified buyer to an apartment',() => {
     const lead=DEMO_PRO_LEADS.find(item => item.id === 'lead-anna')!
     const result=matchLeadToApartment(lead,apartment)
@@ -28,5 +30,14 @@ describe('GeoDom Pro demo',() => {
     expect(analytics.leads).toBe(DEMO_PRO_LEADS.length)
     expect(analytics.medianBudget).toBeGreaterThan(0)
     expect(analytics.topDistricts.length).toBeGreaterThan(0)
+  })
+
+  it('persists CRM pipeline stage per lead',() => {
+    setLeadStage('lead-anna','contacted')
+    setLeadStage('lead-mikhail','viewing')
+    expect(loadLeadPipeline()).toEqual({
+      'lead-anna':'contacted',
+      'lead-mikhail':'viewing'
+    })
   })
 })
