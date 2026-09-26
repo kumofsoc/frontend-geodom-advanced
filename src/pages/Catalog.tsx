@@ -187,6 +187,15 @@ export function Catalog() {
   }
 
   const activeCount = Number(!!filters.district)+Number(!!filters.maxPrice)+Number(!!filters.rooms)+Number(!!filters.minArea)+Number(!!filters.yearFrom)+Number(!!filters.buildingType)+Number(filters.onlyWithPhotos)
+  const filterChips = [
+    filters.district ? { key:'district',label:`Район: ${filters.district}`,clear:() => change('district','') } : null,
+    filters.maxPrice ? { key:'maxPrice',label:`До ${new Intl.NumberFormat('ru-RU').format(filters.maxPrice)} ₽`,clear:() => change('maxPrice',0) } : null,
+    filters.rooms ? { key:'rooms',label:filters.rooms >= 4 ? '4+ комнаты' : `${filters.rooms} комн.`,clear:() => change('rooms',0) } : null,
+    filters.minArea ? { key:'minArea',label:`От ${filters.minArea} м²`,clear:() => change('minArea',0) } : null,
+    filters.yearFrom ? { key:'yearFrom',label:`Дом от ${filters.yearFrom}`,clear:() => change('yearFrom',0) } : null,
+    filters.buildingType ? { key:'buildingType',label:filters.buildingType,clear:() => change('buildingType','') } : null,
+    filters.onlyWithPhotos ? { key:'onlyWithPhotos',label:'Только с фото',clear:() => change('onlyWithPhotos',false) } : null
+  ].filter((chip):chip is { key:string;label:string;clear:()=>void } => chip !== null)
 
   return <div className="dashboard-page">
     <div className="shell dashboard-grid">
@@ -226,6 +235,10 @@ export function Catalog() {
           <input aria-label="Поиск по району или адресу" value={filters.query} onChange={e => change('query',e.target.value)} placeholder="Поиск по району, улице или адресу…"/>
           <button type="submit">Найти <ArrowRight size={16}/></button>
         </form>
+        {filterChips.length > 0 && <div className="active-filter-chips" aria-label="Активные фильтры">
+          {filterChips.map(chip => <button type="button" key={chip.key} onClick={chip.clear}>{chip.label}<span aria-hidden="true">×</span></button>)}
+          <button type="button" className="clear-all" onClick={reset}>Сбросить всё</button>
+        </div>}
 
         <Reveal delay={.08}>
         <div className="map-panel" id="main-map">
