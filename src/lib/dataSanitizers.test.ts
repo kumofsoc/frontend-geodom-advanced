@@ -43,3 +43,16 @@ it('drops rows without valid geometry and keeps missing optional fields as null'
     addressIsApproximate:false
   })
 })
+
+
+it('accepts API wrappers and direct coordinates in addition to parquet WKT', () => {
+  const rows = normalizeGeoObjects({
+    items:[
+      { osm_id:'osm:node/3', category:'transport', name:'Остановка', lat:'56.01', lon:'92.87' },
+      { osm_id:'osm:node/4', category:'education', name:'Школа', geometry:{ type:'Point',coordinates:[92.90,56.04] } }
+    ]
+  })
+  expect(rows).toHaveLength(2)
+  expect(rows[0]).toMatchObject({ lat:56.01,lon:92.87 })
+  expect(rows[1]).toMatchObject({ lat:56.04,lon:92.90 })
+})
