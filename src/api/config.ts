@@ -1,6 +1,6 @@
 export type DataMode='live'|'demo'
 
-const rawMode=String(import.meta.env.VITE_DATA_MODE || 'live').trim().toLowerCase()
+const rawMode=String(import.meta.env.VITE_DATA_MODE || (import.meta.env.MODE === 'test' ? 'demo' : 'live')).trim().toLowerCase()
 
 export const dataMode:DataMode=rawMode === 'demo' ? 'demo' : 'live'
 export const isDemo=dataMode === 'demo'
