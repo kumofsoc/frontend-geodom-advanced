@@ -94,7 +94,8 @@ export const api = {
       return request<Apartment>('/api/apartments', { method:'POST',body:JSON.stringify(backendListingPayload(input)) })
     }
     const owner = getSession()?.user; if (!owner) throw new Error('Для публикации войдите в аккаунт')
-    const item: Apartment = { id: createId(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:input.district_name.toLocaleLowerCase('ru').replace(/\s+/g,'-'), name:input.district_name, description:'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
+    const districtName=input.district_name || 'Уточняется'
+    const item: Apartment = { id: createId(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:districtName === 'Уточняется' ? 'pending' : districtName.toLocaleLowerCase('ru').replace(/\s+/g,'-'), name:districtName, description:districtName === 'Уточняется' ? 'Район не указан.' : 'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
     save(homesKey, [...read<Apartment[]>(homesKey, []), item]); return item
   },
   async update(id: string, input: ListingInput): Promise<Apartment> {
@@ -106,7 +107,9 @@ export const api = {
     items[index] = {
       ...items[index],
       ...input,
-      district:{ ...items[index].district,name:input.district_name,description:'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }
+      district:input.district_name
+        ? { ...items[index].district,name:input.district_name,description:'Район выбран пользователем; сервер сможет перепроверить его по адресу.' }
+        : items[index].district
     }
     save(homesKey, items); return items[index]
   },
