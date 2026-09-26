@@ -237,7 +237,10 @@ export function MapPanel({
           zIndexActive:compactDistricts ? 660 : 1090
         }
       )
-      placemark.events.add('click', () => districtHandler.current(district))
+      placemark.events.add('click', () => {
+        districtHandler.current(district)
+        if (!compactDistricts) instance.setCenter([lat,lon],13,{ checkZoomRange:true,duration:260 })
+      })
       instance.geoObjects.add(placemark)
     }
 
