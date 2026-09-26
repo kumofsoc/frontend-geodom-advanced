@@ -1,5 +1,6 @@
-import { useMemo,useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { Check, RefreshCw, ShieldCheck, UserRoundSearch, X } from 'lucide-react'
+import { api,isDemo } from '../lib/api'
 import {
   buildSharedDemandProfile,
   clearSharedDemandProfile,
@@ -15,6 +16,7 @@ export function DemandSharePanel() {
   const preferences=useGeoDomStore(state => state.preferences)
   const filters=useGeoDomStore(state => state.filters)
   const initial=useMemo(() => {
+    if (!isDemo) return null
     const profile=loadSharedDemandProfile()
     return profile && profile.userId === user?.id ? profile : null
   },[user?.id])
@@ -22,11 +24,30 @@ export function DemandSharePanel() {
   const [contact,setContact]=useState(initial?.contact || '')
   const [consent,setConsent]=useState(Boolean(initial?.consentToContact))
   const [message,setMessage]=useState('')
+  const [busy,setBusy]=useState(false)
+
+  useEffect(() => {
+    if (isDemo || !user) return
+    let cancelled=false
+    setBusy(true)
+    api.demandProfile()
+      .then(next => {
+        if (cancelled) return
+        setProfile(next)
+        setContact(next?.contact || '')
+        setConsent(Boolean(next?.consentToContact))
+      })
+      .catch(error => {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : 'Не удалось загрузить профиль поиска.')
+      })
+      .finally(() => { if (!cancelled) setBusy(false) })
+    return () => { cancelled=true }
+  },[user?.id])
 
   if (!user) return null
   const currentUser=user
 
-  function save() {
+  async function save() {
     if (contact.trim().length < 3) {
       setMessage('Укажите телефон, Telegram или email для связи.')
       return
@@ -39,26 +60,57 @@ export function DemandSharePanel() {
       preferences,
       filters
     })
-    saveSharedDemandProfile(next)
-    setProfile(next)
-    setMessage(consent ? 'Профиль поиска обновлён и доступен подходящим Pro-риелторам в demo.' : 'Профиль сохранён, но передача контакта выключена.')
-  }
-
-  function revoke() {
-    const next=revokeSharedDemandProfile()
-    if (next && next.userId === currentUser.id) {
-      setProfile(next)
-      setConsent(false)
-      setMessage('Согласие на передачу контакта отозвано.')
+    setBusy(true)
+    try {
+      if (isDemo) {
+        saveSharedDemandProfile(next)
+        setProfile(next)
+      } else {
+        setProfile(await api.saveDemandProfile(next))
+      }
+      setMessage(consent
+        ? 'Профиль поиска обновлён. Контакт доступен только подходящим Pro-риелторам.'
+        : 'Профиль сохранён, но передача контакта выключена.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось сохранить профиль поиска.')
+    } finally {
+      setBusy(false)
     }
   }
 
-  function remove() {
-    clearSharedDemandProfile()
-    setProfile(null)
-    setContact('')
-    setConsent(false)
-    setMessage('Профиль поиска удалён из этого браузера.')
+  async function revoke() {
+    setBusy(true)
+    try {
+      if (isDemo) {
+        const next=revokeSharedDemandProfile()
+        if (next && next.userId === currentUser.id) setProfile(next)
+      } else if (profile) {
+        const next={...profile,consentToContact:false,updatedAt:new Date().toISOString()}
+        setProfile(await api.saveDemandProfile(next))
+      }
+      setConsent(false)
+      setMessage('Согласие на передачу контакта отозвано.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось отозвать согласие.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    setBusy(true)
+    try {
+      if (isDemo) clearSharedDemandProfile()
+      else await api.deleteDemandProfile()
+      setProfile(null)
+      setContact('')
+      setConsent(false)
+      setMessage('Профиль поиска удалён.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось удалить профиль поиска.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const district=filters.district || 'Любой район'
@@ -71,7 +123,7 @@ export function DemandSharePanel() {
       <div>
         <small>МОЙ ПОИСК → GEODOM PRO</small>
         <h2>Получать предложения только по вашему сценарию</h2>
-        <p>GeoDom может передать ваш контакт риелтору только когда его объявление подходит под текущие параметры и вы явно разрешили связь.</p>
+        <p>GeoDom передаёт контакт только когда пользователь явно разрешил связь. Согласие можно отозвать или удалить вместе с профилем поиска.</p>
       </div>
       <div className={`demand-share-status ${active ? 'active' : ''}`}>{active ? <><Check size={14}/> Доступен Pro</> : <><ShieldCheck size={14}/> Контакт закрыт</>}</div>
     </div>
@@ -86,21 +138,23 @@ export function DemandSharePanel() {
     <div className="demand-share-form">
       <label>
         <span>Контакт для подходящих риелторов</span>
-        <input value={contact} onChange={event => setContact(event.target.value)} placeholder="+7…, @telegram или email"/>
+        <input value={contact} disabled={busy} onChange={event => setContact(event.target.value)} placeholder="+7…, @telegram или email"/>
       </label>
       <label className="demand-consent">
-        <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/>
-        <span><b>Разрешаю передавать этот контакт подходящим Pro-риелторам</b><small>Согласие можно отозвать в любой момент. Без галочки контакт остаётся закрытым.</small></span>
+        <input type="checkbox" disabled={busy} checked={consent} onChange={event => setConsent(event.target.checked)}/>
+        <span><b>Разрешаю передавать этот контакт подходящим Pro-риелторам</b><small>Без галочки контакт не попадает в выдачу лидов.</small></span>
       </label>
     </div>
 
     <div className="demand-share-actions">
-      <button type="button" className="button dark" onClick={save}><RefreshCw size={15}/> {profile ? 'Обновить профиль поиска' : 'Сохранить профиль поиска'}</button>
-      {profile?.consentToContact && <button type="button" className="button light" onClick={revoke}><ShieldCheck size={15}/> Отозвать согласие</button>}
-      {profile && <button type="button" className="demand-delete" onClick={remove}><X size={15}/> Удалить профиль</button>}
+      <button type="button" className="button dark" disabled={busy} onClick={() => void save()}><RefreshCw size={15}/> {busy ? 'Сохраняем…' : profile ? 'Обновить профиль поиска' : 'Сохранить профиль поиска'}</button>
+      {profile?.consentToContact && <button type="button" className="button light" disabled={busy} onClick={() => void revoke()}><ShieldCheck size={15}/> Отозвать согласие</button>}
+      {profile && <button type="button" className="demand-delete" disabled={busy} onClick={() => void remove()}><X size={15}/> Удалить профиль</button>}
     </div>
 
     {message && <div className="demand-share-message">{message}</div>}
-    <p className="demand-share-footnote">Demo хранит профиль локально в браузере. Backend, биллинг и реальная передача лида пока не подключены.</p>
+    <p className="demand-share-footnote">{isDemo
+      ? 'Demo хранит профиль локально в браузере.'
+      : 'Live mode хранит профиль на backend. Контакт выдаётся Pro только при активном согласии.'}</p>
   </section>
 }
