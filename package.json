@@ -14,7 +14,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "framer-motion": "^12.43.0",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
