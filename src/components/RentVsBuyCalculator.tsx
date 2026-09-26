@@ -9,6 +9,7 @@ export type RentVsBuyInput = {
   downPayment:number
   annualRate:number
   years:number
+  mortgageYears:number
   monthlyRent:number
   rentGrowthPercent:number
   homeGrowthPercent:number
@@ -44,7 +45,7 @@ function mortgageBalance(principal:number,annualRate:number,totalMonths:number,p
 
 export function calculateRentVsBuy(input:RentVsBuyInput):RentVsBuyResult {
   const horizonMonths=Math.max(1,Math.round(input.years*12))
-  const mortgageYears=Math.max(input.years,20)
+  const mortgageYears=Math.max(1,input.mortgageYears)
   const mortgage=calculateMortgage(input.apartmentPrice,input.downPayment,input.annualRate,mortgageYears)
   const mortgageMonths=Math.round(mortgageYears*12)
 
@@ -101,6 +102,7 @@ export function RentVsBuyCalculator({
   const [bankId,setBankId]=useState('sber')
   const [downPayment,setDownPayment]=useState(Math.min(apartmentPrice,defaultDownPayment > 0 ? defaultDownPayment : Math.round(apartmentPrice*.2)))
   const [years,setYears]=useState(10)
+  const [mortgageYears,setMortgageYears]=useState(20)
   const [monthlyRent,setMonthlyRent]=useState(40_000)
   const [rentGrowth,setRentGrowth]=useState(5)
   const [homeGrowth,setHomeGrowth]=useState(4)
@@ -109,13 +111,14 @@ export function RentVsBuyCalculator({
   const [advanced,setAdvanced]=useState(false)
 
   const bank=KRASNOYARSK_MORTGAGE_BANKS.find(item => item.id === bankId) ?? KRASNOYARSK_MORTGAGE_BANKS[0]
-  const eligibility=mortgageOfferEligibility(bank,apartmentPrice,downPayment,Math.max(years,20))
+  const eligibility=mortgageOfferEligibility(bank,apartmentPrice,downPayment,mortgageYears)
   const annualRate=bank.rateFrom
   const result=useMemo(() => annualRate === null ? null : calculateRentVsBuy({
     apartmentPrice,
     downPayment,
     annualRate,
     years,
+    mortgageYears,
     monthlyRent,
     rentGrowthPercent:rentGrowth,
     homeGrowthPercent:homeGrowth,
@@ -123,7 +126,7 @@ export function RentVsBuyCalculator({
     investmentReturnPercent:investmentReturn,
     purchaseCostsPercent:1,
     saleCostsPercent:2
-  }),[apartmentPrice,downPayment,annualRate,years,monthlyRent,rentGrowth,homeGrowth,maintenance,investmentReturn])
+  }),[apartmentPrice,downPayment,annualRate,years,mortgageYears,monthlyRent,rentGrowth,homeGrowth,maintenance,investmentReturn])
 
   return <section className="rent-buy-calculator">
     <div className="rent-buy-head">
@@ -135,7 +138,8 @@ export function RentVsBuyCalculator({
       <label><span>Аренда сейчас, ₽/мес</span><input type="number" min="0" step="1000" value={monthlyRent || ''} onChange={event => setMonthlyRent(Math.max(0,Number(event.target.value)))}/></label>
       <label><span>Первоначальный взнос</span><input type="number" min="0" max={apartmentPrice} step="10000" value={downPayment || ''} onChange={event => setDownPayment(Math.min(apartmentPrice,Math.max(0,Number(event.target.value))))}/></label>
       <label><span>Банк</span><select value={bankId} onChange={event => setBankId(event.target.value)}>{KRASNOYARSK_MORTGAGE_BANKS.filter(item => item.rateFrom !== null).map(item => <option value={item.id} key={item.id}>{item.bank} · от {item.rateFrom}%</option>)}</select></label>
-      <label><span>Горизонт</span><select value={years} onChange={event => setYears(Number(event.target.value))}>{[3,5,7,10,15,20].map(value => <option value={value} key={value}>{value} лет</option>)}</select></label>
+      <label><span>Горизонт сравнения</span><select value={years} onChange={event => setYears(Number(event.target.value))}>{[3,5,7,10,15,20].map(value => <option value={value} key={value}>{value} лет</option>)}</select></label>
+      <label><span>Срок ипотеки</span><select value={mortgageYears} onChange={event => setMortgageYears(Number(event.target.value))}>{[5,10,15,20,25,30].map(value => <option value={value} key={value}>{value} лет</option>)}</select></label>
     </div>
 
     <button type="button" className="rent-buy-advanced-toggle" onClick={() => setAdvanced(value => !value)}>{advanced ? 'Скрыть допущения' : 'Настроить допущения'}</button>
