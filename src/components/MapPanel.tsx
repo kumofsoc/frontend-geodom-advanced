@@ -6,6 +6,8 @@ import { loadYandexMaps } from '../lib/yandexMaps'
 
 type WorkLocation = { lat:number; lon:number } | null
 type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
+const DISTRICT_CARD_MAX_ZOOM = 11
+const APARTMENT_PRICE_MIN_ZOOM = 12
 
 const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
   { key:'education',label:'Школы и детсады',preset:'islands#blueIcon' },
@@ -179,30 +181,33 @@ export function MapPanel({
       if (!point) continue
       groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
 
-      const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
-      const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
-      const active = activeByFilter && activeByDistrict
-      const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
-      const layout = ymaps.templateLayoutFactory.createClass(
-        `<div class="yandex-price-pin ${active ? '' : 'muted'}">${amount} млн ₽</div>`
-      )
-      const placemark = new ymaps.Placemark(
-        [point.lat,point.lon],
-        {
-          hintContent:escapeHtml(item.title),
-          balloonContentHeader:escapeHtml(item.title),
-          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
-        },
-        {
-          iconLayout:layout,
-          iconShape:{ type:'Rectangle',coordinates:[[-52,-34],[52,0]] },
-          zIndex:900
-        }
-      )
-      instance.geoObjects.add(placemark)
+      if (zoom >= APARTMENT_PRICE_MIN_ZOOM) {
+        const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
+        const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
+        const active = activeByFilter && activeByDistrict
+        const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
+        const layout = ymaps.templateLayoutFactory.createClass(
+          `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
+        )
+        const placemark = new ymaps.Placemark(
+          [point.lat,point.lon],
+          {
+            balloonContentHeader:escapeHtml(item.title),
+            balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+          },
+          {
+            iconLayout:layout,
+            iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
+            zIndex:900,
+            zIndexHover:930,
+            zIndexActive:960
+          }
+        )
+        instance.geoObjects.add(placemark)
+      }
     }
 
-    const compactDistricts = zoom >= 13
+    const compactDistricts = zoom > DISTRICT_CARD_MAX_ZOOM
     for (const [district,houses] of groups) {
       const points = houses
         .map(home => validCoordinate(home.latitude,home.longitude))
@@ -227,7 +232,9 @@ export function MapPanel({
           iconShape:compactDistricts
             ? { type:'Circle',coordinates:[0,0],radius:11 }
             : { type:'Rectangle',coordinates:[[-62,-62],[62,0]] },
-          zIndex:760
+          zIndex:compactDistricts ? 620 : 1050,
+          zIndexHover:compactDistricts ? 640 : 1070,
+          zIndexActive:compactDistricts ? 660 : 1090
         }
       )
       placemark.events.add('click', () => districtHandler.current(district))
@@ -297,6 +304,7 @@ export function MapPanel({
 
     <div className="map-layer-panel" aria-label="Слои инфраструктуры">
       <div className="map-layer-title"><b>Слои на карте</b><small>{validApartmentCount} квартир · {geoObjects.length} POI</small></div>
+      <div className="map-lod-status">{zoom <= DISTRICT_CARD_MAX_ZOOM ? 'Обзор районов · приблизьте для цен квартир' : 'Цены квартир · районы показаны точками'}</div>
       {layerMeta.map(layer => <button
         type="button"
         key={layer.key}
