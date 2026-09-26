@@ -1,0 +1,16 @@
+import { useEffect, useState } from 'react'
+import { ArrowRight, Building2, Edit3, EyeOff, Plus, LogOut } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { EmptyState, PageLoading } from '../components/Ui'
+import { api } from '../lib/api'
+import { price } from '../lib/catalog'
+import { useAuth } from '../App'
+import type { Apartment } from '../types'
+const status: Record<string,string> = { published:'Опубликовано', draft:'Черновик', hidden:'Скрыто', deleted:'Удалено' }
+export function Account() {
+  const { user,setUser } = useAuth(); const navigate = useNavigate(); const [items,setItems] = useState<Apartment[]>([]); const [loading,setLoading] = useState(true); const [error,setError] = useState(''); const [busy,setBusy] = useState('')
+  useEffect(() => { api.mine().then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)) },[])
+  async function hide(item: Apartment) { if (!window.confirm('Скрыть объявление из каталога?')) return; setBusy(item.id); try { await api.hide(item.id); setItems(prev => prev.map(x => x.id === item.id ? {...x,status:'hidden'} : x)) } catch(e) { setError(e instanceof Error ? e.message : 'Не удалось скрыть объявление') } finally { setBusy('') } }
+  function logout() { api.logout(); setUser(null); navigate('/') }
+  return <div className="shell account-page"><div className="account-hero"><div><span className="eyebrow light"><span className="eyebrow-line"/> ЛИЧНЫЙ КАБИНЕТ</span><h1>Здравствуйте, <em>{user?.login}.</em></h1><p>Здесь можно управлять вашими объявлениями и добавить новую квартиру.</p></div><div className="account-avatar">{user?.login[0].toUpperCase()}</div></div><div className="account-heading"><div><span className="eyebrow"><span className="eyebrow-line"/> МОЯ НЕДВИЖИМОСТЬ</span><h2>Мои объявления <small>{items.length}</small></h2></div><Link className="button dark" to="/new"><Plus size={18}/> Добавить квартиру</Link></div>{error && <div className="form-error" role="alert">{error}</div>}{loading ? <PageLoading/> : items.length ? <div className="account-list">{items.map(item => <div className="account-item" key={item.id}><div className="account-item-image">{item.photos[0] ? <img src={item.photos[0].url} alt=""/> : <Building2 size={32}/>}</div><div className="account-item-copy"><span className={`status status-${item.status}`}>{status[item.status]}</span><h3>{item.title}</h3><p>{item.address}</p><b>{price(item.price)}</b></div><div className="account-item-actions"><Link to={`/apartments/${item.id}`} className="small-action">Открыть <ArrowRight size={16}/></Link><Link to={`/apartments/${item.id}/edit`} className="small-action"><Edit3 size={16}/> Изменить</Link>{item.status !== 'hidden' && <button className="small-action danger" disabled={busy === item.id} onClick={() => hide(item)}><EyeOff size={16}/> Скрыть</button>}</div></div>)}</div> : <EmptyState title="Пока нет объявлений" message="Добавьте первую квартиру, и она появится здесь." action={<Link className="button dark" to="/new"><Plus size={18}/> Разместить квартиру</Link>}/>}<button className="logout" onClick={logout}><LogOut size={17}/> Выйти из аккаунта</button></div>
+}
