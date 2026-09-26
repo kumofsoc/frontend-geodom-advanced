@@ -44,7 +44,13 @@ function statsToAnalysis(row:BackendDistrictStats):DistrictAnalysis {
   }
 }
 
+export type DistrictDirectoryItem={id:string;name:string;description:string}
+
 export const districtsApi={
+  async directory(signal?:AbortSignal):Promise<DistrictDirectoryItem[]> {
+    if (isDemo) return KRASNOYARSK_DISTRICTS.map(item => ({id:item.id,name:item.name,description:''}))
+    return request<Array<{id:string|number;name:string;description?:string}>>('/api/districts',{signal}).then(rows => rows.map(row => ({id:String(row.id),name:row.name,description:row.description || ''})))
+  },
   async stats(signal?:AbortSignal):Promise<DistrictStats[]> {
     if (isDemo) return buildDistrictStats(demoHomes().filter(x => x.status === 'published'))
     const rows=await request<BackendDistrictStats[]>('/api/district-stats',{signal})
