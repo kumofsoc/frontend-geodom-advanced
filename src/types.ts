@@ -26,7 +26,7 @@ export interface Apartment {
   source_updated_at?:string; collected_at?:string; price_m2?:number; complex_name?:string;
   cover_storage_key?:string; photo_count?:number
 }
-export interface ListingInput { title: string; address: string; price: number; area: number; rooms: number; floor: number; total_floors: number; description: string; kitchen_area?: number; renovation?: string }
+export interface ListingInput { title: string; address: string; district_name: string; price: number; area: number; rooms: number; floor: number; total_floors: number; description: string; kitchen_area?: number; renovation?: string }
 export interface User { id: string; login: string }
 export type CatalogSort = 'recommended' | 'price_asc' | 'price_desc' | 'area_desc'
 export interface CatalogFilters { district: string; maxPrice: number; rooms: number; minArea: number; yearFrom: number; buildingType: string; onlyWithPhotos: boolean; query: string; sort: CatalogSort }
