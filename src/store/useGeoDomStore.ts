@@ -9,6 +9,9 @@ import {
   savePreferences
 } from '../lib/preferences'
 import { getSavedIds, toggleSavedId } from '../lib/recommendations'
+import { migrateLegacyStorage } from '../lib/storage'
+
+migrateLegacyStorage()
 
 const compareKey = 'geodom-compare-apartments-v1'
 const maxCompare = 3
