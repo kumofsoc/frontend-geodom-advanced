@@ -24,6 +24,21 @@ describe('demo listing lifecycle', () => {
     await expect(api.register('FIRST_USER','password456')).rejects.toThrow('занят')
     await expect(api.login('first_user','wrongpass')).rejects.toThrow('Неверный')
   })
+
+  it('registers when crypto.randomUUID is unavailable', async () => {
+    const original = globalThis.crypto
+    Object.defineProperty(globalThis,'crypto',{
+      configurable:true,
+      value:{ getRandomValues:original.getRandomValues.bind(original) }
+    })
+    try {
+      const user = await api.register('compat_user','password123')
+      expect(user.id).toBeTruthy()
+      expect((await api.login('compat_user','password123')).id).toBe(user.id)
+    } finally {
+      Object.defineProperty(globalThis,'crypto',{ configurable:true,value:original })
+    }
+  })
 })
 
 describe('recommendation integration', () => {

@@ -1,6 +1,7 @@
 import { demoApartments } from '../data/demo'
 import { cleanText, finiteNumber } from './dataSanitizers'
 import type { InteractionPayload, RecommendationItem, RecommendationRequest, RecommendationResponse } from '../types'
+import { createId } from './id'
 
 const savedKey = 'geodom-saved-apartments-v1'
 const eventKey = 'geodom-demo-events-v1'
@@ -46,7 +47,7 @@ export function normalizeRecommendation(raw: {
   const keys: Array<keyof RecommendationItem['scores']> = ['schools','parks','transport','ecology','safety','commute','price']
   const items = Array.isArray(raw.items) ? raw.items : []
   return {
-    request_id:cleanText(raw.request_id) || crypto.randomUUID(),
+    request_id:cleanText(raw.request_id) || createId(),
     model_version:cleanText(raw.model_version) || 'unknown',
     scoring_version:cleanText(raw.scoring_version) || 'unknown',
     ml_available:raw.ml_available ?? true,
@@ -114,7 +115,7 @@ export function demoRecommend(input: RecommendationRequest): RecommendationRespo
     }
   }).sort((a,b) => b.score-a.score)
   return {
-    request_id:crypto.randomUUID(),
+    request_id:createId(),
     model_version:'demo-no-model',
     scoring_version:'demo-weighted-v1',
     ml_available:false,

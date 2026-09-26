@@ -10,6 +10,9 @@ export default function CitySignal() {
 
     let frame = 0
     let disposed = false
+    let visible = true
+    let pageVisible = document.visibilityState !== 'hidden'
+    let running = false
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(36,1,0.1,100)
     camera.position.set(0,0,7)
@@ -94,7 +97,11 @@ export default function CitySignal() {
 
     const startedAt = performance.now()
     const render = (now:number) => {
-      if (disposed) return
+      if (disposed || !visible || !pageVisible) {
+        running = false
+        return
+      }
+      running = true
       const time = (now-startedAt)/1000
       group.rotation.z = -0.08+Math.sin(time*0.22)*0.025
       group.rotation.y = Math.sin(time*0.17)*0.08
@@ -102,12 +109,39 @@ export default function CitySignal() {
       renderer.render(scene,camera)
       frame = requestAnimationFrame(render)
     }
-    frame = requestAnimationFrame(render)
+    const ensureRunning = () => {
+      if (disposed || running || !visible || !pageVisible) return
+      frame = requestAnimationFrame(render)
+    }
+    const intersectionObserver = new IntersectionObserver(entries => {
+      visible = entries.some(entry => entry.isIntersecting)
+      if (!visible) {
+        cancelAnimationFrame(frame)
+        running = false
+      } else {
+        ensureRunning()
+      }
+    },{ rootMargin:'80px',threshold:.01 })
+    intersectionObserver.observe(mount)
+
+    const onVisibilityChange = () => {
+      pageVisible = document.visibilityState !== 'hidden'
+      if (!pageVisible) {
+        cancelAnimationFrame(frame)
+        running = false
+      } else {
+        ensureRunning()
+      }
+    }
+    document.addEventListener('visibilitychange',onVisibilityChange)
+    ensureRunning()
 
     return () => {
       disposed = true
       cancelAnimationFrame(frame)
       observer.disconnect()
+      intersectionObserver.disconnect()
+      document.removeEventListener('visibilitychange',onVisibilityChange)
       pointGeometry.dispose()
       pointMaterial.dispose()
       lineGeometry.dispose()

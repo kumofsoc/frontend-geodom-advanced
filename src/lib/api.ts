@@ -2,6 +2,7 @@ import { demoApartments } from '../data/demo'
 import { demoGeoRows } from '../data/demoGeoObjects'
 import { demoRecommend, logDemoEvent, normalizeRecommendation, rememberRecommendation } from './recommendations'
 import { normalizeGeoObjects, type GeoObject } from './dataSanitizers'
+import { createId, demoPasswordDigest, matchesDemoPassword } from './id'
 import type { Apartment, InteractionPayload, ListingInput, RecommendationRequest, RecommendationResponse, User } from '../types'
 
 const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
@@ -29,11 +30,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return raw ? JSON.parse(raw) as T : undefined as T
 }
 const demoHomes = () => [...demoApartments, ...read<Apartment[]>(homesKey, [])]
-async function hash(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
-}
 async function imageData(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height))
@@ -62,12 +58,12 @@ export const api = {
     if (!isDemo) return request<User>('/api/auth/register', { method: 'POST', body: JSON.stringify({ login, password }) })
     await delay(); const users = read<{ user: User; digest: string }[]>(usersKey, [])
     if (users.some(x => x.user.login.toLowerCase() === login.toLowerCase())) throw new Error('Этот логин уже занят')
-    const user = { id: crypto.randomUUID(), login }; users.push({ user, digest: await hash(password) }); save(usersKey, users); return user
+    const user = { id: createId(), login }; users.push({ user, digest: demoPasswordDigest(password) }); save(usersKey, users); return user
   },
   async login(login: string, password: string): Promise<User> {
     if (!isDemo) { const result = await request<{ access_token: string; user: User }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ login, password }) }); storeSession({ user: result.user, token: result.access_token }); return result.user }
     await delay(); const account = read<{ user: User; digest: string }[]>(usersKey, []).find(x => x.user.login.toLowerCase() === login.toLowerCase())
-    if (!account || account.digest !== await hash(password)) throw new Error('Неверный логин или пароль')
+    if (!account || !await matchesDemoPassword(password,account.digest)) throw new Error('Неверный логин или пароль')
     storeSession({ user: account.user, token: 'demo-only' }); return account.user
   },
   async currentUser(): Promise<User | null> { if (isDemo) return getSession()?.user ?? null; if (!getSession()) return null; try { return await request<User>('/api/auth/me') } catch { storeSession(null); return null } },
@@ -75,7 +71,7 @@ export const api = {
   async create(input: ListingInput): Promise<Apartment> {
     if (!isDemo) return request<Apartment>('/api/apartments', { method: 'POST', body: JSON.stringify(input) })
     const owner = getSession()?.user; if (!owner) throw new Error('Для публикации войдите в аккаунт')
-    const item: Apartment = { id: crypto.randomUUID(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:'pending', name:'Уточняется', description:'Район определит сервер после подключения API.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
+    const item: Apartment = { id: createId(), ...input, house_number: input.address.match(/\d+[а-яА-Я]?\s*$/)?.[0] || '', latitude: 0, longitude: 0, district: { id:'pending', name:'Уточняется', description:'Район определит сервер после подключения API.' }, photos: [], source:'user', created_at: new Date().toISOString(), status:'published', owner_id:owner.id, features: { schools_1km:0, parks_1km:0, kindergartens_1km:0, nearest_school_m:0, nearest_park_m:0, nearest_transport_m:0 }, development_projects:[], recommendation:{ score:null, reasons:[], model_version:'', ml_available:false, warning:'Оценка появится после подключения сервера.' } }
     save(homesKey, [...read<Apartment[]>(homesKey, []), item]); return item
   },
   async update(id: string, input: ListingInput): Promise<Apartment> {
@@ -92,7 +88,7 @@ export const api = {
     if (!isDemo) { const data = new FormData(); data.append('file', file); await request(`/api/apartments/${encodeURIComponent(id)}/photos`, { method:'POST', body:data }); return }
     const items = read<Apartment[]>(homesKey, []); const item = items.find(x => x.id === id && x.owner_id === getSession()?.user.id)
     if (!item) throw new Error('Объявление не найдено'); if (item.photos.length >= 10) throw new Error('Не больше 10 фотографий')
-    const order = item.photos.length; item.photos.push({ id:crypto.randomUUID(), url:await imageData(file), order, is_cover:order === 0 })
+    const order = item.photos.length; item.photos.push({ id:createId(), url:await imageData(file), order, is_cover:order === 0 })
     try { save(homesKey, items) } catch { item.photos.pop(); throw new Error('В браузере закончилось место для фото. Подключите серверное хранилище.') }
   }
 }

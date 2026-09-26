@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { ChevronDown, Layers3 } from 'lucide-react'
 import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
 import { validCoordinate, type GeoObject } from '../lib/dataSanitizers'
 import { loadYandexMaps } from '../lib/yandexMaps'
+import { createSpatialIndex, type SpatialBounds } from '../lib/spatialIndex'
 
 type WorkLocation = { lat:number; lon:number } | null
 type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
+
 const CITY_OVERVIEW_MAX_ZOOM = 8
 const DISTRICT_CARD_MAX_ZOOM = 10
 const APARTMENT_CLUSTER_MIN_ZOOM = 11
@@ -23,11 +25,11 @@ const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
   { key:'daily',label:'Магазины и сервисы',preset:'islands#orangeIcon' }
 ]
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char] || char))
+function escapeHtml(value:string) {
+  return value.replace(/[&<>"']/g,char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char] || char))
 }
 
-function safeHttpUrl(value: string | null) {
+function safeHttpUrl(value:string|null) {
   if (!value) return null
   try {
     const url = new URL(value)
@@ -37,20 +39,18 @@ function safeHttpUrl(value: string | null) {
   }
 }
 
-function score10(value: number | null) {
+function score10(value:number|null) {
   if (value === null || !Number.isFinite(value)) return null
-  return value > 10 ? value / 10 : value
+  return value > 10 ? value/10 : value
 }
 
-type ViewportBounds = { minLat:number;maxLat:number;minLon:number;maxLon:number }
-
-function boundsFromYandex(value: unknown): ViewportBounds | null {
+function boundsFromYandex(value:unknown):SpatialBounds|null {
   if (!Array.isArray(value) || value.length < 2) return null
-  const first = value[0]
-  const second = value[1]
+  const first=value[0]
+  const second=value[1]
   if (!Array.isArray(first) || !Array.isArray(second)) return null
-  const lat1 = Number(first[0]); const lon1 = Number(first[1])
-  const lat2 = Number(second[0]); const lon2 = Number(second[1])
+  const lat1=Number(first[0]); const lon1=Number(first[1])
+  const lat2=Number(second[0]); const lon2=Number(second[1])
   if (![lat1,lon1,lat2,lon2].every(Number.isFinite)) return null
   return {
     minLat:Math.min(lat1,lat2),
@@ -60,21 +60,20 @@ function boundsFromYandex(value: unknown): ViewportBounds | null {
   }
 }
 
-function withinViewport(lat:number,lon:number,bounds:ViewportBounds|null,padding=.18) {
-  if (!bounds) return true
-  const latPad=(bounds.maxLat-bounds.minLat)*padding
-  const lonPad=(bounds.maxLon-bounds.minLon)*padding
-  return lat >= bounds.minLat-latPad && lat <= bounds.maxLat+latPad && lon >= bounds.minLon-lonPad && lon <= bounds.maxLon+lonPad
-}
-
-function classifyGeoObject(item: GeoObject): PoiLayer | null {
-  const value = `${item.category} ${item.subcategory || ''}`.toLowerCase()
+function classifyGeoObject(item:GeoObject):PoiLayer|null {
+  const value=`${item.category} ${item.subcategory || ''}`.toLowerCase()
   if (/(school|kindergarten|college|university|education|школ|сад|образован)/.test(value)) return 'education'
   if (/(park|garden|green|forest|recreation|парк|сквер|зел)/.test(value)) return 'parks'
   if (/(health|hospital|clinic|pharmacy|doctor|мед|больниц|поликлин|аптек)/.test(value)) return 'healthcare'
   if (/(transport|bus|tram|rail|station|stop|metro|транспорт|останов|вокзал)/.test(value)) return 'transport'
   if (/(shop|supermarket|market|cafe|restaurant|sport|fitness|amenity|магаз|кафе|ресторан|спорт)/.test(value)) return 'daily'
   return null
+}
+
+function removeOverlay(instance:any,overlayRef:MutableRefObject<any>) {
+  if (!overlayRef.current) return
+  try { instance.geoObjects.remove(overlayRef.current) } catch {}
+  overlayRef.current=null
 }
 
 export function MapPanel({
@@ -94,25 +93,30 @@ export function MapPanel({
   onDistrict:(district:string)=>void
   workLocation:WorkLocation
   workPicking:boolean
-  onWorkLocation:(location:{ lat:number; lon:number })=>void
+  onWorkLocation:(location:{ lat:number;lon:number })=>void
   activeApartmentIds?:Set<string>
   scoreByApartment?:Map<string,number>
 }) {
-  const element = useRef<HTMLDivElement>(null)
-  const map = useRef<any>(null)
-  const ymapsRef = useRef<any>(null)
-  const districtHandler = useRef(onDistrict)
-  const workHandler = useRef(onWorkLocation)
-  const pickingRef = useRef(workPicking)
-  const resizeObserver = useRef<ResizeObserver | null>(null)
-  const viewportTimer = useRef<number | null>(null)
-  const fittedSignature = useRef('')
-  const [ready,setReady] = useState(false)
-  const [zoom,setZoom] = useState(11)
-  const [viewport,setViewport] = useState<ViewportBounds|null>(null)
-  const [loadError,setLoadError] = useState('')
-  const [layersOpen,setLayersOpen] = useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
-  const [layers,setLayers] = useState<Record<PoiLayer,boolean>>({
+  const element=useRef<HTMLDivElement>(null)
+  const map=useRef<any>(null)
+  const ymapsRef=useRef<any>(null)
+  const districtHandler=useRef(onDistrict)
+  const workHandler=useRef(onWorkLocation)
+  const pickingRef=useRef(workPicking)
+  const resizeObserver=useRef<ResizeObserver|null>(null)
+  const viewportTimer=useRef<number|null>(null)
+  const fittedSignature=useRef('')
+  const apartmentOverlay=useRef<any>(null)
+  const districtOverlay=useRef<any>(null)
+  const poiOverlay=useRef<any>(null)
+  const workOverlay=useRef<any>(null)
+
+  const [ready,setReady]=useState(false)
+  const [zoom,setZoom]=useState(11)
+  const [viewport,setViewport]=useState<SpatialBounds|null>(null)
+  const [loadError,setLoadError]=useState('')
+  const [layersOpen,setLayersOpen]=useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
+  const [layers,setLayers]=useState<Record<PoiLayer,boolean>>({
     education:true,
     parks:true,
     healthcare:true,
@@ -120,83 +124,96 @@ export function MapPanel({
     daily:false
   })
 
-  districtHandler.current = onDistrict
-  workHandler.current = onWorkLocation
-  pickingRef.current = workPicking
+  districtHandler.current=onDistrict
+  workHandler.current=onWorkLocation
+  pickingRef.current=workPicking
 
-  const layerCounts = useMemo(() => {
-    const counts: Record<PoiLayer,number> = { education:0,parks:0,healthcare:0,transport:0,daily:0 }
+  const layerCounts=useMemo(() => {
+    const counts:Record<PoiLayer,number>={ education:0,parks:0,healthcare:0,transport:0,daily:0 }
     for (const item of geoObjects) {
-      const layer = classifyGeoObject(item)
-      if (layer) counts[layer] += 1
+      const layer=classifyGeoObject(item)
+      if (layer) counts[layer]+=1
     }
     return counts
   },[geoObjects])
 
-  const validApartments = useMemo(
+  const validApartments=useMemo(
     () => items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude)),
     [items]
   )
-  const validApartmentCount = validApartments.length
-  const apartmentMode:'hidden'|'cluster'|'prices' = zoom <= CITY_OVERVIEW_MAX_ZOOM
+  const validApartmentCount=validApartments.length
+
+  const apartmentIndex=useMemo(
+    () => createSpatialIndex(validApartments,item => validCoordinate(item.latitude,item.longitude),.015),
+    [validApartments]
+  )
+  const poiIndex=useMemo(
+    () => createSpatialIndex(geoObjects,item => ({ lat:item.lat,lon:item.lon }),.015),
+    [geoObjects]
+  )
+
+  const apartmentMode:'hidden'|'cluster'|'prices'=zoom <= CITY_OVERVIEW_MAX_ZOOM
     ? 'hidden'
     : zoom < APARTMENT_CLUSTER_MIN_ZOOM
       ? 'hidden'
       : zoom < APARTMENT_PRICE_MIN_ZOOM
         ? 'cluster'
         : 'prices'
-  const visibleApartments = useMemo(
-    () => validApartments.filter(item => {
-      const point = validCoordinate(item.latitude,item.longitude)
-      return !!point && withinViewport(point.lat,point.lon,viewport)
-    }),
-    [validApartments,viewport]
+
+  const visibleApartments=useMemo(
+    () => apartmentMode === 'hidden' ? [] : apartmentIndex.query(viewport,{ padding:.18 }),
+    [apartmentIndex,viewport,apartmentMode]
   )
-  const useApartmentClusters = apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
-  const eligiblePoi = useMemo(
-    () => zoom >= POI_MIN_ZOOM
-      ? geoObjects.filter(item => withinViewport(item.lat,item.lon,viewport))
-      : [],
-    [geoObjects,zoom,viewport]
+  const useApartmentClusters=apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
+
+  const eligiblePoi=useMemo(
+    () => zoom >= POI_MIN_ZOOM ? poiIndex.query(viewport,{ padding:.18 }) : [],
+    [poiIndex,zoom,viewport]
   )
-  const visiblePoi = useMemo(() => eligiblePoi.slice(0,MAX_POI_MARKS),[eligiblePoi])
+  const visiblePoi=useMemo(() => eligiblePoi.slice(0,MAX_POI_MARKS),[eligiblePoi])
+
+  const districtGroups=useMemo(() => {
+    const groups=new Map<string,Apartment[]>()
+    for (const item of validApartments) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
+    return groups
+  },[validApartments])
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled=false
     if (!element.current || map.current) return
 
     loadYandexMaps().then(ymaps => {
       if (cancelled || !element.current) return
-      const instance = new ymaps.Map(element.current, {
+      const instance=new ymaps.Map(element.current,{
         center:[56.014,92.87],
         zoom:11,
         controls:['zoomControl','fullscreenControl']
-      }, {
+      },{
         minZoom:3,
         maxZoom:19,
         suppressMapOpenBlock:true
       })
 
       instance.behaviors.enable(['drag','scrollZoom','dblClickZoom','multiTouch'])
-      const syncViewport = () => {
+      const syncViewport=() => {
         if (viewportTimer.current !== null) window.clearTimeout(viewportTimer.current)
-        viewportTimer.current = window.setTimeout(() => {
+        viewportTimer.current=window.setTimeout(() => {
           setZoom(instance.getZoom())
           setViewport(boundsFromYandex(instance.getBounds()))
         },90)
       }
-      instance.events.add('boundschange', syncViewport)
+      instance.events.add('boundschange',syncViewport)
       syncViewport()
-      instance.events.add('click', (event:any) => {
+      instance.events.add('click',(event:any) => {
         if (!pickingRef.current) return
-        const coords = event.get('coords')
-        const point = validCoordinate(coords?.[0],coords?.[1])
+        const coords=event.get('coords')
+        const point=validCoordinate(coords?.[0],coords?.[1])
         if (point) workHandler.current(point)
       })
 
-      ymapsRef.current = ymaps
-      map.current = instance
-      resizeObserver.current = new ResizeObserver(() => instance.container.fitToViewport())
+      ymapsRef.current=ymaps
+      map.current=instance
+      resizeObserver.current=new ResizeObserver(() => instance.container.fitToViewport())
       resizeObserver.current.observe(element.current)
       setReady(true)
     }).catch(error => {
@@ -204,169 +221,168 @@ export function MapPanel({
     })
 
     return () => {
-      cancelled = true
+      cancelled=true
       resizeObserver.current?.disconnect()
-      resizeObserver.current = null
+      resizeObserver.current=null
       if (viewportTimer.current !== null) window.clearTimeout(viewportTimer.current)
-      viewportTimer.current = null
+      viewportTimer.current=null
       map.current?.destroy()
-      map.current = null
-      ymapsRef.current = null
+      map.current=null
+      ymapsRef.current=null
     }
   },[])
 
   useEffect(() => {
-    const instance = map.current
-    const ymaps = ymapsRef.current
+    const instance=map.current
+    if (!ready || !instance || workPicking || !validApartments.length) return
+    const signature=validApartments.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
+    if (!signature || signature === fittedSignature.current) return
+
+    const points=validApartments
+      .map(item => validCoordinate(item.latitude,item.longitude))
+      .filter((point):point is { lat:number;lon:number } => point !== null)
+
+    if (points.length > 1) {
+      const latitudes=points.map(point => point.lat)
+      const longitudes=points.map(point => point.lon)
+      instance.setBounds([
+        [Math.min(...latitudes),Math.min(...longitudes)],
+        [Math.max(...latitudes),Math.max(...longitudes)]
+      ],{ checkZoomRange:true,zoomMargin:[48,48] })
+    } else if (points.length === 1) {
+      instance.setCenter([points[0].lat,points[0].lon],13)
+    }
+    fittedSignature.current=signature
+  },[ready,validApartments,workPicking])
+
+  useEffect(() => {
+    const instance=map.current
+    const ymaps=ymapsRef.current
     if (!ready || !instance || !ymaps) return
 
-    instance.geoObjects.removeAll()
-    const valid = validApartments
-    const groups = new Map<string,Apartment[]>()
-    for (const item of valid) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
-    const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
-    const apartmentRenderSet = apartmentMode === 'hidden' ? [] : visibleApartments
+    removeOverlay(instance,apartmentOverlay)
+    if (apartmentMode === 'hidden' || !visibleApartments.length) return
 
-    if (signature && signature !== fittedSignature.current && !workPicking) {
-      const points = valid
-        .map(item => validCoordinate(item.latitude,item.longitude))
-        .filter((point):point is { lat:number; lon:number } => point !== null)
+    if (useApartmentClusters) {
+      const features=visibleApartments.flatMap((item,index) => {
+        const point=validCoordinate(item.latitude,item.longitude)
+        if (!point) return []
+        const activeByFilter=!activeApartmentIds || activeApartmentIds.has(String(item.id))
+        const activeByDistrict=!selectedDistrict || selectedDistrict === item.district.name
+        const active=activeByFilter && activeByDistrict
+        const personalScore=scoreByApartment?.get(String(item.id))
+        const displayedScore=typeof personalScore === 'number' && Number.isFinite(personalScore)
+          ? personalScore
+          : score10(item.recommendation.score)
 
-      if (points.length > 1) {
-        const latitudes = points.map(point => point.lat)
-        const longitudes = points.map(point => point.lon)
-        const bounds = [
-          [Math.min(...latitudes),Math.min(...longitudes)],
-          [Math.max(...latitudes),Math.max(...longitudes)]
-        ]
-        instance.setBounds(bounds,{ checkZoomRange:true,zoomMargin:[48,48] })
-      } else if (points.length === 1) instance.setCenter([points[0].lat,points[0].lon],13)
-      fittedSignature.current = signature
+        return [{
+          type:'Feature',
+          id:`${item.id}-${index}`,
+          geometry:{ type:'Point',coordinates:[point.lat,point.lon] },
+          properties:{
+            balloonContentHeader:escapeHtml(item.title),
+            balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+          },
+          options:{ preset:active ? 'islands#blueCircleIcon' : 'islands#grayCircleIcon' }
+        }]
+      })
+
+      if (!features.length) return
+      const objectManager=new ymaps.ObjectManager({
+        clusterize:true,
+        gridSize:72,
+        clusterDisableClickZoom:false,
+        geoObjectOpenBalloonOnClick:true
+      })
+      objectManager.clusters.options.set('preset','islands#blueClusterIcons')
+      objectManager.add({ type:'FeatureCollection',features })
+      apartmentOverlay.current=objectManager
+      instance.geoObjects.add(objectManager)
+      return
     }
 
-    if (apartmentMode !== 'hidden') {
-      if (useApartmentClusters) {
-        const apartmentMarks:any[] = []
-        for (const item of apartmentRenderSet) {
-          const point = validCoordinate(item.latitude,item.longitude)
-          if (!point) continue
-          const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
-          const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
-          const active = activeByFilter && activeByDistrict
-          const personalScore = scoreByApartment?.get(String(item.id))
-          const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
-            ? personalScore
-            : score10(item.recommendation.score)
-
-          apartmentMarks.push(new ymaps.Placemark(
-            [point.lat,point.lon],
-            {
-              balloonContentHeader:escapeHtml(item.title),
-              balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
-            },
-            {
-              preset:active ? 'islands#blueCircleIcon' : 'islands#grayCircleIcon',
-              zIndex:500
-            }
-          ))
-        }
-
-        if (apartmentMarks.length) {
-          const clusterer = new ymaps.Clusterer({
-            preset:'islands#blueClusterIcons',
-            groupByCoordinates:false,
-            clusterDisableClickZoom:false,
-            clusterHideIconOnBalloonOpen:false,
-            geoObjectHideIconOnBalloonOpen:false,
-            gridSize:72,
-            minClusterSize:3
-          })
-          clusterer.add(apartmentMarks)
-          instance.geoObjects.add(clusterer)
-        }
-      } else {
-        for (const item of apartmentRenderSet) {
-          const point = validCoordinate(item.latitude,item.longitude)
-          if (!point) continue
-          const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
-          const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
-          const active = activeByFilter && activeByDistrict
-          const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
-          const personalScore = scoreByApartment?.get(String(item.id))
-          const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
-            ? personalScore
-            : score10(item.recommendation.score)
-          const layout = ymaps.templateLayoutFactory.createClass(
-            `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
-          )
-          const placemark = new ymaps.Placemark(
-            [point.lat,point.lon],
-            {
-              balloonContentHeader:escapeHtml(item.title),
-              balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
-            },
-            {
-              iconLayout:layout,
-              iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
-              interactiveZIndex:false,
-              zIndex:900,
-              zIndexHover:900,
-              zIndexActive:920
-            }
-          )
-          instance.geoObjects.add(placemark)
-        }
-      }
-    }
-
-    if (zoom <= CITY_OVERVIEW_MAX_ZOOM && valid.length) {
-      const points = valid
-        .map(item => validCoordinate(item.latitude,item.longitude))
-        .filter((point):point is { lat:number;lon:number } => point !== null)
-      const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
-      const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
-      const layout = ymaps.templateLayoutFactory.createClass(
-        `<div class="yandex-city-summary"><strong>Красноярск</strong><span>${valid.length} квартир</span><small>Приблизьте карту</small></div>`
+    const collection=new ymaps.GeoObjectCollection()
+    for (const item of visibleApartments) {
+      const point=validCoordinate(item.latitude,item.longitude)
+      if (!point) continue
+      const activeByFilter=!activeApartmentIds || activeApartmentIds.has(String(item.id))
+      const activeByDistrict=!selectedDistrict || selectedDistrict === item.district.name
+      const active=activeByFilter && activeByDistrict
+      const amount=new Intl.NumberFormat('ru-RU',{ maximumFractionDigits:1 }).format(item.price/1000000)
+      const personalScore=scoreByApartment?.get(String(item.id))
+      const displayedScore=typeof personalScore === 'number' && Number.isFinite(personalScore)
+        ? personalScore
+        : score10(item.recommendation.score)
+      const layout=ymaps.templateLayoutFactory.createClass(
+        `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
       )
-      const cityPlacemark = new ymaps.Placemark(
-        [lat,lon],
-        {},
+      collection.add(new ymaps.Placemark(
+        [point.lat,point.lon],
+        {
+          balloonContentHeader:escapeHtml(item.title),
+          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+        },
         {
           iconLayout:layout,
-          iconShape:{ type:'Rectangle',coordinates:[[-70,-70],[70,5]] },
+          iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
           interactiveZIndex:false,
-          zIndex:1100,
-          zIndexHover:1100
+          zIndex:900,
+          zIndexHover:900,
+          zIndexActive:920
         }
-      )
-      cityPlacemark.events.add('click', () => instance.setCenter([lat,lon],10,{ checkZoomRange:true,duration:260 }))
-      instance.geoObjects.add(cityPlacemark)
+      ))
     }
+    apartmentOverlay.current=collection
+    instance.geoObjects.add(collection)
+  },[ready,apartmentMode,visibleApartments,useApartmentClusters,activeApartmentIds,selectedDistrict,scoreByApartment])
 
-    const compactDistricts = zoom > DISTRICT_CARD_MAX_ZOOM
-    if (zoom > CITY_OVERVIEW_MAX_ZOOM) for (const [district,houses] of groups) {
-      const points = houses
-        .map(home => validCoordinate(home.latitude,home.longitude))
-        .filter((point):point is { lat:number; lon:number } => point !== null)
-      if (!points.length) continue
+  useEffect(() => {
+    const instance=map.current
+    const ymaps=ymapsRef.current
+    if (!ready || !instance || !ymaps) return
 
-      const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
-      const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
-      const scores = houses.map(home => {
-        const personal = scoreByApartment?.get(String(home.id))
-        return typeof personal === 'number' && Number.isFinite(personal) ? personal : score10(home.recommendation.score)
-      }).filter((value):value is number => value !== null)
-      const average = scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
-      const active = selectedDistrict === district
-      const html = compactDistricts
-        ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
-        : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span><div>${average === null ? '<b>—</b>' : `<b>${average.toFixed(1)}</b>`}<em>/10</em></div><small>${houses.length} ${houses.length === 1 ? 'квартира' : houses.length < 5 ? 'квартиры' : 'квартир'}</small></div>`
+    removeOverlay(instance,districtOverlay)
+    const collection=new ymaps.GeoObjectCollection()
 
-      const layout = ymaps.templateLayoutFactory.createClass(html)
-      const placemark = new ymaps.Placemark(
-        [lat,lon],
-        { hintContent:escapeHtml(district) },
-        {
+    if (zoom <= CITY_OVERVIEW_MAX_ZOOM && validApartments.length) {
+      const points=validApartments
+        .map(item => validCoordinate(item.latitude,item.longitude))
+        .filter((point):point is { lat:number;lon:number } => point !== null)
+      const lat=points.reduce((sum,point) => sum+point.lat,0)/points.length
+      const lon=points.reduce((sum,point) => sum+point.lon,0)/points.length
+      const layout=ymaps.templateLayoutFactory.createClass(
+        `<div class="yandex-city-summary"><strong>Красноярск</strong><span>${validApartments.length} квартир</span><small>Приблизьте карту</small></div>`
+      )
+      const cityPlacemark=new ymaps.Placemark([lat,lon],{},{
+        iconLayout:layout,
+        iconShape:{ type:'Rectangle',coordinates:[[-70,-70],[70,5]] },
+        interactiveZIndex:false,
+        zIndex:1100,
+        zIndexHover:1100
+      })
+      cityPlacemark.events.add('click',() => instance.setCenter([lat,lon],10,{ checkZoomRange:true,duration:260 }))
+      collection.add(cityPlacemark)
+    } else if (zoom > CITY_OVERVIEW_MAX_ZOOM) {
+      const compactDistricts=zoom > DISTRICT_CARD_MAX_ZOOM
+      for (const [district,houses] of districtGroups) {
+        const points=houses
+          .map(home => validCoordinate(home.latitude,home.longitude))
+          .filter((point):point is { lat:number;lon:number } => point !== null)
+        if (!points.length) continue
+
+        const lat=points.reduce((sum,point) => sum+point.lat,0)/points.length
+        const lon=points.reduce((sum,point) => sum+point.lon,0)/points.length
+        const scores=houses.map(home => {
+          const personal=scoreByApartment?.get(String(home.id))
+          return typeof personal === 'number' && Number.isFinite(personal) ? personal : score10(home.recommendation.score)
+        }).filter((value):value is number => value !== null)
+        const average=scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
+        const active=selectedDistrict === district
+        const html=compactDistricts
+          ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
+          : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span><div>${average === null ? '<b>—</b>' : `<b>${average.toFixed(1)}</b>`}<em>/10</em></div><small>${houses.length} ${houses.length === 1 ? 'квартира' : houses.length < 5 ? 'квартиры' : 'квартир'}</small></div>`
+        const layout=ymaps.templateLayoutFactory.createClass(html)
+        const placemark=new ymaps.Placemark([lat,lon],{ hintContent:escapeHtml(district) },{
           iconLayout:layout,
           iconShape:compactDistricts
             ? { type:'Circle',coordinates:[0,0],radius:11 }
@@ -375,23 +391,35 @@ export function MapPanel({
           zIndex:compactDistricts ? 620 : 1050,
           zIndexHover:compactDistricts ? 620 : 1050,
           zIndexActive:compactDistricts ? 640 : 1070
-        }
-      )
-      placemark.events.add('click', () => {
-        districtHandler.current(district)
-        if (!compactDistricts) instance.setCenter([lat,lon],13,{ checkZoomRange:true,duration:260 })
-      })
-      instance.geoObjects.add(placemark)
+        })
+        placemark.events.add('click',() => {
+          districtHandler.current(district)
+          if (!compactDistricts) instance.setCenter([lat,lon],13,{ checkZoomRange:true,duration:260 })
+        })
+        collection.add(placemark)
+      }
     }
 
-    const poiMarks:any[] = []
+    districtOverlay.current=collection
+    instance.geoObjects.add(collection)
+  },[ready,zoom,validApartments,districtGroups,selectedDistrict,scoreByApartment])
+
+  useEffect(() => {
+    const instance=map.current
+    const ymaps=ymapsRef.current
+    if (!ready || !instance || !ymaps) return
+
+    removeOverlay(instance,poiOverlay)
+    if (!visiblePoi.length) return
+
+    const marks:any[]=[]
     for (const item of visiblePoi) {
-      const layer = classifyGeoObject(item)
+      const layer=classifyGeoObject(item)
       if (!layer || !layers[layer]) continue
-      const meta = layerMeta.find(candidate => candidate.key === layer)
+      const meta=layerMeta.find(candidate => candidate.key === layer)
       if (!meta) continue
-      const sourceUrl = safeHttpUrl(item.sourceUrl)
-      const body = [
+      const sourceUrl=safeHttpUrl(item.sourceUrl)
+      const body=[
         item.address ? `<span>${escapeHtml(item.address)}</span>` : '',
         item.source ? `<small>Источник: ${escapeHtml(item.source)}</small>` : '',
         item.sourceUpdatedAt ? `<small>Обновлено у источника: ${escapeHtml(item.sourceUpdatedAt)}</small>` : '',
@@ -399,48 +427,51 @@ export function MapPanel({
         sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Открыть источник →</a>` : ''
       ].filter(Boolean).join('<br>')
 
-      poiMarks.push(new ymaps.Placemark(
-        [item.lat,item.lon],
-        {
-          hintContent:escapeHtml(item.name),
-          balloonContentHeader:escapeHtml(item.name),
-          balloonContentBody:body || 'Данные об объекте инфраструктуры'
-        },
-        {
-          preset:meta.preset,
-          zIndex:220
-        }
-      ))
+      marks.push(new ymaps.Placemark([item.lat,item.lon],{
+        hintContent:escapeHtml(item.name),
+        balloonContentHeader:escapeHtml(item.name),
+        balloonContentBody:body || 'Данные об объекте инфраструктуры'
+      },{
+        preset:meta.preset,
+        zIndex:220
+      }))
     }
 
-    if (poiMarks.length) {
-      const clusterer = new ymaps.Clusterer({
-        groupByCoordinates:false,
-        clusterDisableClickZoom:false,
-        clusterHideIconOnBalloonOpen:false,
-        geoObjectHideIconOnBalloonOpen:false
-      })
-      clusterer.add(poiMarks)
-      instance.geoObjects.add(clusterer)
-    }
+    if (!marks.length) return
+    const clusterer=new ymaps.Clusterer({
+      groupByCoordinates:false,
+      clusterDisableClickZoom:false,
+      clusterHideIconOnBalloonOpen:false,
+      geoObjectHideIconOnBalloonOpen:false,
+      gridSize:64
+    })
+    clusterer.add(marks)
+    poiOverlay.current=clusterer
+    instance.geoObjects.add(clusterer)
+  },[ready,visiblePoi,layers])
 
-    if (workLocation) {
-      const point = validCoordinate(workLocation.lat,workLocation.lon)
-      if (point) {
-        const workPlacemark = new ymaps.Placemark(
-          [point.lat,point.lon],
-          { iconCaption:'Работа',hintContent:'Место работы',balloonContent:'Выбранное место работы' },
-          { preset:'islands#redIcon',draggable:true,zIndex:1500 }
-        )
-        workPlacemark.events.add('dragend', () => {
-          const coords = workPlacemark.geometry.getCoordinates()
-          const next = validCoordinate(coords?.[0],coords?.[1])
-          if (next) workHandler.current(next)
-        })
-        instance.geoObjects.add(workPlacemark)
-      }
-    }
-  },[validApartments,visibleApartments,visiblePoi,selectedDistrict,workLocation,workPicking,ready,zoom,viewport,activeApartmentIds,scoreByApartment,layers,apartmentMode,useApartmentClusters])
+  useEffect(() => {
+    const instance=map.current
+    const ymaps=ymapsRef.current
+    if (!ready || !instance || !ymaps) return
+
+    removeOverlay(instance,workOverlay)
+    const point=workLocation ? validCoordinate(workLocation.lat,workLocation.lon) : null
+    if (!point) return
+
+    const placemark=new ymaps.Placemark(
+      [point.lat,point.lon],
+      { iconCaption:'Работа',hintContent:'Место работы',balloonContent:'Выбранное место работы' },
+      { preset:'islands#redIcon',draggable:true,zIndex:1500 }
+    )
+    placemark.events.add('dragend',() => {
+      const coords=placemark.geometry.getCoordinates()
+      const next=validCoordinate(coords?.[0],coords?.[1])
+      if (next) workHandler.current(next)
+    })
+    workOverlay.current=placemark
+    instance.geoObjects.add(placemark)
+  },[ready,workLocation])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
