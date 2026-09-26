@@ -136,3 +136,9 @@
 @media(max-width:1150px){.city-signal{right:10px;width:310px;opacity:.5}.dashboard-intro>div:first-child{max-width:720px}}
 @media(max-width:760px){.city-signal{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.home-card,.district-card,.yandex-price-pin,.yandex-district-pin,.yandex-district-dot{animation:none!important;transition:none!important}}
+
+
+/* Map LOD / large dataset states */
+.yandex-city-summary{transform:translate3d(-50%,-100%,0);min-width:138px;display:grid;justify-items:center;gap:2px;padding:11px 14px 10px;border:1px solid #cfe1f5;border-radius:12px;background:#fffffff4;box-shadow:0 10px 28px #173d6740;color:#173d67;backdrop-filter:blur(9px);user-select:none}
+.yandex-city-summary strong{font-size:13px;letter-spacing:-.2px}.yandex-city-summary span{font-size:10px;font-weight:800;color:#1476e8}.yandex-city-summary small{font-size:7.5px;font-weight:700;color:#8aa0b4}
+@media(max-width:520px){.yandex-city-summary{min-width:120px;padding:9px 11px}.yandex-city-summary strong{font-size:11px}.yandex-city-summary span{font-size:9px}}
