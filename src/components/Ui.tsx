@@ -10,10 +10,11 @@ export function ApartmentCard({ item, index = 0 }: { item: Apartment; index?: nu
   const savedIds = useGeoDomStore(state => state.savedIds)
   const toggleSaved = useGeoDomStore(state => state.toggleSaved)
   const saved = savedIds.includes(item.id)
+  const photoCount = item.photo_count ?? item.photos.length
   return <article className="home-card" style={{ animationDelay: `${index * 60}ms` }}>
     <button type="button" className={`card-like ${saved ? 'saved' : ''}`} aria-label={saved ? 'Убрать квартиру из сохранённого' : 'Сохранить квартиру'} onClick={() => toggleSaved(item.id)}><Heart size={18} fill={saved ? 'currentColor' : 'none'}/></button>
     <Link to={`/apartments/${item.id}`} className="home-card-link">
-      <div className="home-card-image">{cover ? <img src={cover} alt={item.title} loading="lazy" /> : <div className="image-placeholder">GEODOM</div>}<span className="photo-count">{item.photos.length ? `01 / ${String(item.photos.length).padStart(2, '0')}` : 'БЕЗ ФОТО'}</span></div>
+      <div className="home-card-image">{cover ? <img src={cover} alt={item.title} loading="lazy" /> : <div className="image-placeholder">GEODOM</div>}<span className="photo-count">{photoCount ? `01 / ${String(photoCount).padStart(2, '0')}` : 'БЕЗ ФОТО'}</span></div>
       <div className="home-card-info"><div className="card-price">{price(item.price)} <ArrowUpRight size={19}/></div><h3>{item.title}</h3><div className="card-address"><MapPin size={14}/>{item.address}</div><div className="card-bottom"><span>{item.rooms === 0 ? 'Студия' : `${item.rooms}-комн.`}</span><span>{area(item.area)}</span><span>{item.floor} / {item.total_floors} эт.</span></div>{item.recommendation.score !== null && <div className="card-match"><Sparkles size={14}/> Обзорная оценка {(item.recommendation.score > 10 ? item.recommendation.score/10 : item.recommendation.score).toFixed(1)}/10 <small>{item.recommendation.ml_available ? 'ML' : 'демо'}</small></div>}</div>
     </Link>
   </article>
