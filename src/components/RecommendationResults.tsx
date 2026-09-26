@@ -29,8 +29,13 @@ export function RecommendationResults({ response, loading, error, onRetry }:{ re
   const compared = useGeoDomStore(state => state.comparedIds)
   const toggleSaved = useGeoDomStore(state => state.toggleSaved)
   const toggleCompared = useGeoDomStore(state => state.toggleCompared)
+  const pruneCompared = useGeoDomStore(state => state.pruneCompared)
   const clearCompared = useGeoDomStore(state => state.clearCompared)
   const sent = useRef(new Set<string>())
+  useEffect(() => {
+    if (!response) return
+    pruneCompared(response.items.map(item => String(item.apartment_id)))
+  },[response?.request_id,pruneCompared])
   function track(event:InteractionEvent,item:RecommendationItem,position:number) {
     if (!response) return
     const key = `${response.request_id}:${event}:${item.apartment_id}`
