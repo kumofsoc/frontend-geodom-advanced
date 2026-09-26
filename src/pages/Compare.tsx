@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowLeft, ArrowUpRight, GitCompareArrows, MapPin, Sparkles, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
@@ -100,7 +100,7 @@ export function Compare() {
     {loading && <div className="compare-page-loading"><span className="spinner"/> Загружаем карточки…</div>}
 
     <div className="compare-scroll">
-      <div className="compare-matrix" style={{ '--compare-count':Math.max(2,comparedIds.length) } as React.CSSProperties}>
+      <div className="compare-matrix" style={{ '--compare-count':Math.max(2,comparedIds.length) } as CSSProperties}>
         <div className="compare-label-cell compare-sticky-label">Объект</div>
         {comparedIds.map(id => {
           const state=details.find(item => item.id === id)
@@ -198,7 +198,7 @@ function CompareRow({
 }:{
   label:string
   ids:string[]
-  render:(id:string)=>React.ReactNode
+  render:(id:string)=>ReactNode
   wrap?:boolean
 }) {
   return <>
