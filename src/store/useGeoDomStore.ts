@@ -49,6 +49,7 @@ interface GeoDomState {
   refreshSavedIds:()=>void
   toggleSaved:(id:string)=>boolean
   toggleCompared:(id:string)=>boolean
+  pruneCompared:(availableIds:Iterable<string>)=>void
   clearCompared:()=>void
 
   setUser:(user:User|null)=>void
@@ -121,6 +122,14 @@ export const useGeoDomStore = create<GeoDomState>((set,get) => ({
     writeComparedIds(comparedIds)
     set({ comparedIds })
     return comparedIds.includes(id)
+  },
+
+  pruneCompared(availableIds) {
+    const available = new Set(availableIds)
+    const comparedIds = get().comparedIds.filter(id => available.has(id))
+    if (comparedIds.length === get().comparedIds.length) return
+    writeComparedIds(comparedIds)
+    set({ comparedIds })
   },
 
   clearCompared() {
