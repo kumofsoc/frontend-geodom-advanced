@@ -17,7 +17,7 @@ export type ProLead={
   createdAt:string
   consentToContact:boolean
   contact:string
-  source:'demo'|'local'
+  source:'demo'|'local'|'backend'
 }
 
 export const DEMO_PRO_LEADS:ProLead[]=[
