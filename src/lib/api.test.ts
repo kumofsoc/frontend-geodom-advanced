@@ -48,3 +48,13 @@ describe('recommendation integration', () => {
     expect(readDemoEvents()[0]).toMatchObject({ request_id:response.request_id,event:'click',position:1 })
   })
 })
+
+
+describe('district analytics', () => {
+  it('returns all seven Krasnoyarsk districts in demo mode', async () => {
+    const stats = await api.districtStats()
+    expect(stats).toHaveLength(7)
+    expect(new Set(stats.map(item => item.name)).size).toBe(7)
+    expect(stats.some(item => item.count > 0)).toBe(true)
+  })
+})
