@@ -1,5 +1,5 @@
 import { useEffect,useMemo,useState } from 'react'
-import { ArrowRight, BadgeCheck, BarChart3, Building2, Check, Crown, LockKeyhole, Megaphone, Phone, Target, Users } from 'lucide-react'
+import { BadgeCheck, BarChart3, Building2, Check, Crown, LockKeyhole, Megaphone, Phone, Target, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
