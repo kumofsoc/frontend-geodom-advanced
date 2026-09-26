@@ -19,7 +19,7 @@ export function loadYandexMaps(): Promise<any> {
       if ((window as YandexWindow).ymaps) ready()
       else {
         existing.addEventListener('load', ready, { once:true })
-        existing.addEventListener('error', () => reject(new Error('Не удалось загрузить Yandex Maps API')), { once:true })
+        existing.addEventListener('error', () => { existing.remove(); reject(new Error('Не удалось загрузить Yandex Maps API')) }, { once:true })
       }
       return
     }
@@ -30,7 +30,7 @@ export function loadYandexMaps(): Promise<any> {
     script.async = true
     script.src = `https://api-maps.yandex.ru/2.1/?lang=ru_RU${apiKey ? `&apikey=${encodeURIComponent(apiKey)}` : ''}`
     script.addEventListener('load', ready, { once:true })
-    script.addEventListener('error', () => reject(new Error('Не удалось загрузить Yandex Maps API')), { once:true })
+    script.addEventListener('error', () => { script.remove(); reject(new Error('Не удалось загрузить Yandex Maps API')) }, { once:true })
     document.head.append(script)
   }).catch(error => {
     loader = null
