@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import type { Apartment } from '../types'
 import { area, price } from '../lib/catalog'
 import { useGeoDomStore } from '../store/useGeoDomStore'
+import { resolvePhotoUrl } from '../lib/media'
 export function ApartmentCard({ item, index = 0 }: { item: Apartment; index?: number }) {
-  const cover = item.photos.find(x => x.is_cover)?.url || item.photos[0]?.url
+  const coverPhoto = item.photos.find(x => x.is_cover) || item.photos[0]
+  const cover = coverPhoto ? resolvePhotoUrl(coverPhoto) : null
   const savedIds = useGeoDomStore(state => state.savedIds)
   const toggleSaved = useGeoDomStore(state => state.toggleSaved)
   const saved = savedIds.includes(item.id)
