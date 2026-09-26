@@ -20,9 +20,6 @@ export function Pro() {
   const [unlocked,setUnlocked]=useState<string[]>([])
   const [pipeline,setPipeline]=useState<Record<string,LeadStage>>(loadLeadPipeline)
   const [stageFilter,setStageFilter]=useState<'all'|LeadStage>('all')
-  const [proStatus,setProStatus]=useState<'loading'|'none'|'trial'|'active'|'expired'|'disabled'>(isDemo ? 'active' : 'loading')
-  const [liveMatches,setLiveMatches]=useState<Array<{lead:ProLead;score:number;reasons:string[];stage:LeadStage}>>([])
-  const [proBusy,setProBusy]=useState(false)
   const sharedProfile=useMemo(() => loadSharedDemandProfile(),[])
   const crmLeads=useMemo(() => {
     if (!isDemo) return []
