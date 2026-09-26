@@ -81,6 +81,11 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
     selectedProgram.maxAmount === null ? 0 : propertyPrice-selectedProgram.maxAmount
   )
   const suggestedDown=Math.ceil(Math.max(0,requiredProgramDown)/10_000)*10_000
+  const marketRequiredDown=Math.max(
+    selectedBankOffer.minDownPaymentPercent === null ? 0 : propertyPrice*selectedBankOffer.minDownPaymentPercent/100,
+    selectedBankOffer.maxAmount === null ? 0 : propertyPrice-selectedBankOffer.maxAmount
+  )
+  const marketSuggestedDown=Math.ceil(Math.max(0,marketRequiredDown)/10_000)*10_000
   const programReasons=programId === 'market' ? selectedBank.eligibility.reasons : programId === 'custom' ? [] : programEligibility.reasons
 
   function changeProgram(id:MortgageProgramId) {
@@ -90,6 +95,11 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
   }
 
   function fitProgram() {
+    if (programId === 'market') {
+      setDownPayment(clamp(marketSuggestedDown,0,propertyPrice))
+      if (selectedBankOffer.maxYears !== null && years > selectedBankOffer.maxYears) setYears(selectedBankOffer.maxYears)
+      return
+    }
     setDownPayment(clamp(suggestedDown,0,propertyPrice))
     if (selectedProgram.maxYears !== null && years > selectedProgram.maxYears) setYears(selectedProgram.maxYears)
   }
@@ -147,7 +157,7 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
 
         {programId !== 'market' && programId !== 'custom' && <div className={'mortgage-program-note '+(selectedProgram.available ? '' : 'warning')}><Info size={16}/><div><b>{selectedProgram.title}</b><p>{selectedProgram.description}</p>{selectedProgram.warning && <small>{selectedProgram.warning}</small>}{selectedProgram.sourceUrl && <a href={selectedProgram.sourceUrl} target="_blank" rel="noopener noreferrer">Условия программы <ArrowUpRight size={12}/></a>}</div></div>}
 
-        {programReasons.length > 0 && <div className="mortgage-fit-warning"><div><BadgePercent size={16}/><span><b>Текущие параметры не проходят</b>{programReasons.join(' · ')}</span></div>{programId !== 'far-east' && programId !== 'market' && <button type="button" onClick={fitProgram}>Подогнать взнос и срок</button>}</div>}
+        {programReasons.length > 0 && <div className="mortgage-fit-warning"><div><BadgePercent size={16}/><span><b>Текущие параметры не проходят</b>{programReasons.join(' · ')}</span></div>{programId !== 'far-east' && <button type="button" onClick={fitProgram}>{programId === 'market' ? 'Подогнать к банку' : 'Подогнать взнос и срок'}</button>}</div>}
       </div>
 
       <aside className="mortgage-summary-card">
