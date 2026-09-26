@@ -21,7 +21,8 @@ export function MapPanel({
   onDistrict,
   workLocation,
   workPicking,
-  onWorkLocation
+  onWorkLocation,
+  activeApartmentIds
 }:{
   items:Apartment[]
   selectedDistrict:string
@@ -29,6 +30,7 @@ export function MapPanel({
   workLocation:WorkLocation
   workPicking:boolean
   onWorkLocation:(location:{ lat:number; lon:number })=>void
+  activeApartmentIds?:Set<string>
 }) {
   const element = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
@@ -37,6 +39,7 @@ export function MapPanel({
   const workHandler = useRef(onWorkLocation)
   const pickingRef = useRef(workPicking)
   const resizeObserver = useRef<ResizeObserver | null>(null)
+  const fittedSignature = useRef('')
   const [ready,setReady] = useState(false)
   const [zoom,setZoom] = useState(11)
   const [loadError,setLoadError] = useState('')
@@ -100,13 +103,25 @@ export function MapPanel({
     instance.geoObjects.removeAll()
     const valid = items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude))
     const groups = new Map<string,Apartment[]>()
+    const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
+    if (signature && signature !== fittedSignature.current && !workPicking) {
+      const bounds = valid
+        .map(item => validCoordinate(item.latitude,item.longitude))
+        .filter((point):point is { lat:number; lon:number } => point !== null)
+        .map(point => [point.lat,point.lon])
+      if (bounds.length > 1) instance.setBounds(bounds,{ checkZoomRange:true,zoomMargin:[48,48] })
+      else if (bounds.length === 1) instance.setCenter(bounds[0],13)
+      fittedSignature.current = signature
+    }
 
     for (const item of valid) {
       const point = validCoordinate(item.latitude,item.longitude)
       if (!point) continue
       groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
 
-      const active = !selectedDistrict || selectedDistrict === item.district.name
+      const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
+      const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
+      const active = activeByFilter && activeByDistrict
       const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
       const layout = ymaps.templateLayoutFactory.createClass(
         `<div class="yandex-price-pin ${active ? '' : 'muted'}">${amount} млн ₽</div>`
@@ -172,7 +187,7 @@ export function MapPanel({
         instance.geoObjects.add(workPlacemark)
       }
     }
-  },[items,selectedDistrict,workLocation,workPicking,ready,zoom])
+  },[items,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
