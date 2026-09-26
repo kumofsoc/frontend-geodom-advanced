@@ -50,7 +50,9 @@ export function Catalog() {
     api.recommend(loadPreferences())
       .then(setResponse)
       .catch(e => {
-        if (!saved) setRecommendationError(e instanceof Error ? e.message : 'Сервер рекомендаций недоступен')
+        const message = e instanceof Error ? e.message : 'Сервер рекомендаций недоступен'
+        if (!saved) setRecommendationError(message)
+        else setResponse({ ...saved,warnings:[...saved.warnings,'Показан сохранённый результат: сервер временно недоступен.'] })
       })
       .finally(() => setRecommendationLoading(false))
   },[])
@@ -108,7 +110,9 @@ export function Catalog() {
       const result = await api.recommend(value)
       setResponse(result)
     } catch(e) {
-      setRecommendationError(e instanceof Error ? e.message : 'Сервер рекомендаций недоступен')
+      const message = e instanceof Error ? e.message : 'Сервер рекомендаций недоступен'
+      if (response) setResponse({ ...response,warnings:[...response.warnings.filter(w => !w.startsWith('Показан сохранённый результат')),'Показан сохранённый результат: сервер временно недоступен.'] })
+      else setRecommendationError(message)
     } finally {
       setRecommendationLoading(false)
     }
