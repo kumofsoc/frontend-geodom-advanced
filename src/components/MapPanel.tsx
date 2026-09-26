@@ -15,6 +15,8 @@ const APARTMENT_CLUSTER_MIN_ZOOM = 11
 const APARTMENT_PRICE_MIN_ZOOM = 13
 const POI_MIN_ZOOM = 12
 const MAX_PRICE_PINS = 320
+const MAX_COMPACT_PRICE_PINS = 140
+const COMPACT_PRICE_PIN_MAX_ZOOM = 14
 const MAX_POI_MARKS = 1200
 
 const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
@@ -164,7 +166,9 @@ export function MapPanel({
     () => apartmentMode === 'hidden' ? [] : apartmentIndex.query(viewport,{ padding:.18 }),
     [apartmentIndex,viewport,apartmentMode]
   )
-  const useApartmentClusters=apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
+  const compactPricePins=apartmentMode === 'prices' && zoom <= COMPACT_PRICE_PIN_MAX_ZOOM
+  const pricePinBudget=compactPricePins ? MAX_COMPACT_PRICE_PINS : MAX_PRICE_PINS
+  const useApartmentClusters=apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > pricePinBudget)
 
   const eligiblePoi=useMemo(
     () => zoom >= POI_MIN_ZOOM ? poiIndex.query(viewport,{ padding:.18 }) : [],
@@ -314,9 +318,9 @@ export function MapPanel({
         ? personalScore
         : score10(item.recommendation.score)
       const layout=ymaps.templateLayoutFactory.createClass(
-        `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
+        `<div class="yandex-price-pin ${compactPricePins ? 'compact' : ''} ${active ? '' : 'muted'}"><span class="price-short">${amount}м</span><span class="price-full">${amount} млн ₽</span></div>`
       )
-      collection.add(new ymaps.Placemark(
+      const placemark=new ymaps.Placemark(
         [point.lat,point.lon],
         {
           balloonContentHeader:escapeHtml(item.title),
@@ -324,17 +328,22 @@ export function MapPanel({
         },
         {
           iconLayout:layout,
-          iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
+          iconShape:{ type:'Rectangle',coordinates:[[-60,-38],[60,5]] },
           interactiveZIndex:false,
           zIndex:900,
           zIndexHover:900,
-          zIndexActive:920
+          zIndexActive:2500
         }
-      ))
+      )
+      placemark.events.add('mouseenter',() => placemark.options.set('zIndex',2400))
+      placemark.events.add('mouseleave',() => placemark.options.set('zIndex',900))
+      placemark.events.add('balloonopen',() => placemark.options.set('zIndex',2500))
+      placemark.events.add('balloonclose',() => placemark.options.set('zIndex',900))
+      collection.add(placemark)
     }
     apartmentOverlay.current=collection
     instance.geoObjects.add(collection)
-  },[ready,apartmentMode,visibleApartments,useApartmentClusters,activeApartmentIds,selectedDistrict,scoreByApartment])
+  },[ready,apartmentMode,visibleApartments,useApartmentClusters,compactPricePins,activeApartmentIds,selectedDistrict,scoreByApartment])
 
   useEffect(() => {
     const instance=map.current
@@ -490,7 +499,9 @@ export function MapPanel({
               ? 'Районы · квартиры появятся при приближении'
               : useApartmentClusters
                 ? `Кластеры квартир · ${visibleApartments.length} в текущей области`
-                : `Цены квартир · ${visibleApartments.length} в текущей области`
+                : compactPricePins
+                  ? `Компактные цены · ${visibleApartments.length} в текущей области`
+                  : `Цены квартир · ${visibleApartments.length} в текущей области`
         }</div>
         {layerMeta.map(layer => <button
           type="button"
