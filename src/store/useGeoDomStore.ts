@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CatalogFilters, RecommendationRequest, User } from '../types'
+import type { CatalogFilters, HousingIntent, RecommendationRequest, User } from '../types'
 import {
   defaultCatalogFilters,
   defaultPreferences,
@@ -15,6 +15,8 @@ migrateLegacyStorage()
 
 const compareKey = 'geodom-compare-apartments-v1'
 const maxCompare = 3
+const intentKey='geodom-housing-intent-v1'
+const readIntent=():HousingIntent => localStorage.getItem(intentKey) === 'rent' ? 'rent' : 'buy'
 
 function readComparedIds(): string[] {
   try {
@@ -40,6 +42,7 @@ interface GeoDomState {
   savedIds:string[]
   comparedIds:string[]
   user:User|null
+  housingIntent:HousingIntent
 
   setPreferences:(next:ValueOrUpdater<RecommendationRequest>)=>void
   setFilter:<K extends keyof CatalogFilters>(key:K,value:CatalogFilters[K])=>void
@@ -57,6 +60,7 @@ interface GeoDomState {
   clearCompared:()=>void
 
   setUser:(user:User|null)=>void
+  setHousingIntent:(intent:HousingIntent)=>void
 }
 
 export const useGeoDomStore = create<GeoDomState>((set,get) => ({
@@ -67,6 +71,7 @@ export const useGeoDomStore = create<GeoDomState>((set,get) => ({
   savedIds:getSavedIds(),
   comparedIds:readComparedIds(),
   user:null,
+  housingIntent:readIntent(),
 
   setPreferences(next) {
     const value = typeof next === 'function'
@@ -148,6 +153,11 @@ export const useGeoDomStore = create<GeoDomState>((set,get) => ({
 
   setUser(user) {
     set({ user })
+  },
+
+  setHousingIntent(housingIntent) {
+    localStorage.setItem(intentKey,housingIntent)
+    set({ housingIntent })
   }
 }))
 
