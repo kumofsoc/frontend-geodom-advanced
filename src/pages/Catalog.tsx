@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Building2, ChevronDown, CircleHelp, MapPin, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApartmentCard, EmptyState, PageLoading } from '../components/Ui'
 import { MapPanel } from '../components/MapPanel'
 import { PreferencePanel } from '../components/PreferencePanel'
 import { RecommendationResults } from '../components/RecommendationResults'
+import { Reveal } from '../components/MotionPrimitives'
 import { api, isDemo } from '../lib/api'
 import { filterApartments } from '../lib/catalog'
 import { defaultPreferences, validatePreferences } from '../lib/preferences'
@@ -12,6 +13,8 @@ import { loadLastRecommendation } from '../lib/recommendations'
 import type { GeoObject } from '../lib/dataSanitizers'
 import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, RecommendationResponse } from '../types'
 import { useGeoDomStore } from '../store/useGeoDomStore'
+
+const CitySignal = lazy(() => import('../components/CitySignal'))
 
 export function Catalog() {
   const [items,setItems] = useState<Apartment[]>([])
@@ -195,7 +198,7 @@ export function Catalog() {
         onStartWorkPick={startWorkPick}
       />
       <div className="dashboard-main">
-        <div className="dashboard-intro">
+        <Reveal className="dashboard-intro">
           <div>
             <span className="dashboard-kicker">GEODOM · АНАЛИЗ ГОРОДСКОЙ СРЕДЫ</span>
             <h1>Выберите квартиру <em>с пониманием района</em></h1>
@@ -206,7 +209,8 @@ export function Catalog() {
             <div><b>{districts.length || '—'} районов</b><small>для осознанного выбора</small></div>
             <ArrowUpRight size={16}/>
           </div>
-        </div>
+          <Suspense fallback={null}><CitySignal/></Suspense>
+        </Reveal>
 
         <form className="dashboard-search" onSubmit={search}>
           <Search size={19}/>
@@ -214,6 +218,7 @@ export function Catalog() {
           <button type="submit">Найти <ArrowRight size={16}/></button>
         </form>
 
+        <Reveal delay={.08}>
         <div className="map-panel" id="main-map">
           <div className="map-topbar">
             <div><span className="map-tab active"><MapPin size={16}/> Яндекс Карта</span><span className="map-tab secondary">Красноярск и районы</span></div>
@@ -236,9 +241,11 @@ export function Catalog() {
                 />}
           <div className="map-caption"><CircleHelp size={15}/> Районы превращаются в точки при приближении. Инфраструктура кластеризуется и фильтруется слоями.{geoError ? ` Слой POI недоступен: ${geoError}.` : ''} <span>Картография © Яндекс</span></div>
         </div>
+        </Reveal>
 
-        <RecommendationResults response={response} loading={recommendationLoading} error={recommendationError} onRetry={() => { void recommend(preferences) }}/>
+        <Reveal delay={.04}><RecommendationResults response={response} loading={recommendationLoading} error={recommendationError} onRetry={() => { void recommend(preferences) }}/></Reveal>
 
+        <Reveal>
         <div className="dashboard-section-title">
           <div><h2>Районы <span>Красноярска</span></h2><p>Обзор квартир и инфраструктуры по районам</p></div>
           <span className="mini-label">{isDemo ? 'ДЕМОНСТРАЦИОННЫЕ ОЦЕНКИ' : 'ОБЗОР РАЙОНОВ'}</span>
@@ -249,7 +256,9 @@ export function Catalog() {
           <p>{d.description}</p>
           <div className="district-card-bottom">Смотреть квартиры <ArrowRight size={16}/></div>
         </button>)}</div>
+        </Reveal>
 
+        <Reveal>
         <section className="listings-section" id="catalog">
           <div className="dashboard-section-title listings-title">
             <div><h2>Все <span>квартиры</span></h2><p>{loading ? 'Загружаем предложения…' : `${visible.length} предложений в каталоге`}</p></div>
@@ -275,6 +284,7 @@ export function Catalog() {
                 ? <div className="card-grid">{visible.map((item,index) => <ApartmentCard item={item} index={index} key={item.id}/>)}</div>
                 : <EmptyState title="Ничего не нашлось" message="Попробуйте расширить бюджет или выбрать другой район." action={<button className="button dark" onClick={reset}>Сбросить фильтры</button>}/>}
         </section>
+        </Reveal>
 
         <div className="dashboard-end">
           <span><Sparkles size={18}/> ГеоДом помогает смотреть дальше квартиры</span>
