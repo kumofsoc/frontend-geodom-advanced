@@ -30,6 +30,7 @@ export function localMediaUrl(value:string|null|undefined) {
 export function resolvePhotoUrl(photo:Partial<ApartmentPhoto>) {
   const url=typeof photo.url === 'string' ? photo.url.trim() : ''
   if (url) return url
+  if (photo.publication_allowed === false && !allowUnverifiedLocalMedia) return null
   return localMediaUrl(photo.local_path || photo.storage_key)
 }
 
