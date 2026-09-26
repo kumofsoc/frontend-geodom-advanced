@@ -1,8 +1,9 @@
-import { useMemo,useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { ArrowLeft,ArrowRight,ArrowUpRight,Baby,BriefcaseBusiness,Building2,Check,ChevronDown,Landmark,Save,ShieldCheck,Sparkles,UserRound } from 'lucide-react'
 import { price as formatPrice } from '../lib/catalog'
 import { KRASNOYARSK_MORTGAGE_BANKS,KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE,mortgageOfferEligibility,type MortgageBankOffer } from '../lib/mortgageBanks'
 import { mortgageProgramEligibility,resolveMortgageProgram,type MortgageProgramTerms } from '../lib/mortgagePrograms'
+import { clearMortgageWizardDraft,loadMortgageWizardDraft,saveMortgageCalculation,saveMortgageWizardDraft } from '../lib/mortgageStorage'
 
 export type MortgageCalculation={ principal:number; monthlyPayment:number; totalPayment:number; overpayment:number }
 export type MortgageWizardScenario='newbuild'|'secondary'|'family'|'it'
@@ -29,8 +30,6 @@ const BANK_MARKS:Record<string,string>={
   kuban:'КК',primsoc:'ПС',khmb:'ХМ',atb:'АТБ',akcept:'АК',levoberezhny:'ЛБ',
   vbrr:'ВБ',uralsib:'УР',sdm:'СД',metallinvest:'МИ',ingo:'ИН',bzhf:'БЖ'
 }
-
-const savedCalculationsKey='geodom-mortgage-calculations-v1'
 
 export function calculateMortgage(price:number,downPayment:number,annualRate:number,years:number):MortgageCalculation {
   const safePrice=Math.max(0,Number.isFinite(price) ? price : 0)
@@ -131,19 +130,20 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
 }) {
   const initialPrice=Math.max(300_000,Math.round(apartmentPrice))
   const initialDown=Math.min(initialPrice,defaultDownPayment > 0 ? defaultDownPayment : Math.round(initialPrice*.2))
+  const [initialDraft]=useState(() => loadMortgageWizardDraft(initialPrice))
 
-  const [step,setStep]=useState<1|2|3|4>(1)
-  const [scenario,setScenario]=useState<MortgageWizardScenario>('secondary')
-  const [bankId,setBankId]=useState('sber')
-  const [propertyPrice,setPropertyPrice]=useState(initialPrice)
-  const [downPayment,setDownPayment]=useState(initialDown)
-  const [years,setYears]=useState(20)
-  const [monthlyIncome,setMonthlyIncome]=useState(0)
-  const [existingPayments,setExistingPayments]=useState(0)
-  const [employment,setEmployment]=useState<'employee'|'self'|'business'>('employee')
-  const [childrenCount,setChildrenCount]=useState(1)
-  const [youngestChildAge,setYoungestChildAge]=useState<number|null>(3)
-  const [itAccredited,setItAccredited]=useState(false)
+  const [step,setStep]=useState<1|2|3|4>(initialDraft?.step ?? 1)
+  const [scenario,setScenario]=useState<MortgageWizardScenario>(initialDraft?.scenario ?? 'secondary')
+  const [bankId,setBankId]=useState(initialDraft?.bankId ?? 'sber')
+  const [propertyPrice,setPropertyPrice]=useState(initialDraft?.propertyPrice ?? initialPrice)
+  const [downPayment,setDownPayment]=useState(Math.min(initialDraft?.downPayment ?? initialDown,initialDraft?.propertyPrice ?? initialPrice))
+  const [years,setYears]=useState(initialDraft?.years ?? 20)
+  const [monthlyIncome,setMonthlyIncome]=useState(initialDraft?.monthlyIncome ?? 0)
+  const [existingPayments,setExistingPayments]=useState(initialDraft?.existingPayments ?? 0)
+  const [employment,setEmployment]=useState<'employee'|'self'|'business'>(initialDraft?.employment ?? 'employee')
+  const [childrenCount,setChildrenCount]=useState(initialDraft?.childrenCount ?? 1)
+  const [youngestChildAge,setYoungestChildAge]=useState<number|null>(initialDraft?.youngestChildAge ?? 3)
+  const [itAccredited,setItAccredited]=useState(initialDraft?.itAccredited ?? false)
   const [showAllBanks,setShowAllBanks]=useState(false)
   const [saved,setSaved]=useState(false)
 
@@ -193,24 +193,21 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
 
   function saveCalculation() {
     if (!selected?.result) return
-    const record={
-      id:globalThis.crypto?.randomUUID?.() ?? `mortgage-${Date.now()}`,
-      createdAt:new Date().toISOString(),
-      apartmentPrice:propertyPrice,
-      downPayment,
-      years,
-      scenario,
-      bankId:selected.offer.id,
-      bank:selected.offer.bank,
-      rate:selected.rate,
-      monthlyPayment:selected.result.monthlyPayment,
-      totalPayment:selected.result.totalPayment,
-      overpayment:selected.result.overpayment
-    }
     try {
-      const current=JSON.parse(localStorage.getItem(savedCalculationsKey) || '[]')
-      const items=Array.isArray(current) ? current : []
-      localStorage.setItem(savedCalculationsKey,JSON.stringify([record,...items].slice(0,10)))
+      saveMortgageCalculation({
+        id:globalThis.crypto?.randomUUID?.() ?? `mortgage-${Date.now()}`,
+        createdAt:new Date().toISOString(),
+        apartmentPrice:propertyPrice,
+        downPayment,
+        years,
+        scenario,
+        bankId:selected.offer.id,
+        bank:selected.offer.bank,
+        rate:selected.rate,
+        monthlyPayment:selected.result.monthlyPayment,
+        totalPayment:selected.result.totalPayment,
+        overpayment:selected.result.overpayment
+      })
       setSaved(true)
     } catch {
       setSaved(false)
@@ -220,6 +217,46 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
   const familyNeedsAttention=scenario === 'family' && !program.available
   const itNeedsAttention=scenario === 'it' && !itAccredited
 
+  useEffect(() => {
+    const timer=window.setTimeout(() => {
+      saveMortgageWizardDraft({
+        sourcePrice:initialPrice,
+        step,
+        scenario,
+        bankId,
+        propertyPrice,
+        downPayment,
+        years,
+        monthlyIncome,
+        existingPayments,
+        employment,
+        childrenCount,
+        youngestChildAge,
+        itAccredited,
+        updatedAt:new Date().toISOString()
+      })
+    },180)
+    return () => window.clearTimeout(timer)
+  },[initialPrice,step,scenario,bankId,propertyPrice,downPayment,years,monthlyIncome,existingPayments,employment,childrenCount,youngestChildAge,itAccredited])
+
+  function resetWizard() {
+    clearMortgageWizardDraft()
+    setStep(1)
+    setScenario('secondary')
+    setBankId('sber')
+    setPropertyPrice(initialPrice)
+    setDownPayment(initialDown)
+    setYears(20)
+    setMonthlyIncome(0)
+    setExistingPayments(0)
+    setEmployment('employee')
+    setChildrenCount(1)
+    setYoungestChildAge(3)
+    setItAccredited(false)
+    setShowAllBanks(false)
+    setSaved(false)
+  }
+
   return <section className="mortgage-wizard" aria-labelledby="mortgage-title">
     <header className="mortgage-wizard-header">
       <div>
@@ -227,7 +264,7 @@ export function MortgageCalculator({ apartmentPrice,apartmentArea,defaultDownPay
         <h3 id="mortgage-title">Ипотечный калькулятор</h3>
         <p>Пройдите 4 шага: программа и банк → параметры заёмщика → расчёт → итоговое предложение.</p>
       </div>
-      <span className="mortgage-wizard-date">Данные банков: {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}</span>
+      <div className="mortgage-wizard-head-actions"><span className="mortgage-wizard-date">Данные банков: {new Date(KRASNOYARSK_MORTGAGE_SNAPSHOT_DATE).toLocaleDateString('ru-RU')}</span><button type="button" onClick={resetWizard}>Начать заново</button></div>
     </header>
 
     <div className="mortgage-wizard-progress" aria-label={`Шаг ${step} из 4`}>
