@@ -42,6 +42,9 @@ export function validateApartment(input:ListingInput):string[] {
   return errors
 }
 
-export const price=(n:number) => new Intl.NumberFormat('ru-RU').format(n)+' ₽'
-export const area=(n:number) => new Intl.NumberFormat('ru-RU',{ maximumFractionDigits:1 }).format(n)+' м²'
-export const distance=(n:number) => n < 1000 ? `${n} м` : `${(n/1000).toLocaleString('ru-RU',{ maximumFractionDigits:1 })} км`
+const integerFormatter=new Intl.NumberFormat('ru-RU')
+const decimalFormatter=new Intl.NumberFormat('ru-RU',{ maximumFractionDigits:1 })
+
+export const price=(n:number) => integerFormatter.format(n)+' ₽'
+export const area=(n:number) => decimalFormatter.format(n)+' м²'
+export const distance=(n:number) => n < 1000 ? `${n} м` : `${decimalFormatter.format(n/1000)} км`
