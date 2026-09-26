@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach,describe,expect,it } from 'vitest'
 import { DEMO_PRO_LEADS,leadAnalytics,loadLeadPipeline,matchLeadToApartment,setLeadStage } from './pro'
 import type { Apartment } from '../types'
