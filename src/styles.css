@@ -39,3 +39,18 @@
 .work-location-clear{width:38px;display:grid;place-items:center;border:1px solid #f0d8d8;background:#fff8f8;color:#b85a5a;border-radius:8px}
 .work-location-clear:hover{background:#fff0f0}
 @media(max-width:520px){.work-pick-hint{max-width:calc(100% - 26px);white-space:normal;text-align:center}.map-legend{right:8px;top:auto;bottom:8px;padding:8px 10px}.map-legend span{font-size:8px}}
+
+
+/* Infrastructure layers */
+.map-layer-panel{position:absolute;right:14px;top:14px;z-index:520;width:208px;background:#fffffff2;border:1px solid #dfe8f2;border-radius:10px;box-shadow:0 8px 24px #173d6730;padding:10px;backdrop-filter:blur(8px)}
+.map-layer-title{display:flex;align-items:center;justify-content:space-between;padding:2px 3px 8px}
+.map-layer-title b{font-size:10px;color:#294866}.map-layer-title small{font-size:8px;color:#8ba0b4}
+.map-layer-panel>button{width:100%;display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;border:0;background:transparent;border-radius:7px;padding:7px 6px;color:#8194a7;text-align:left}
+.map-layer-panel>button:hover{background:#f2f7fc}.map-layer-panel>button.active{background:#eef6ff;color:#2e5579}
+.map-layer-panel>button span{font-size:9px;font-weight:800}.map-layer-panel>button small{font-size:8px;color:#9aabbb}
+.poi-dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px #ffffff}
+.poi-dot.education{background:#2784f4}.poi-dot.parks{background:#11a86e}.poi-dot.healthcare{background:#e75555}.poi-dot.transport{background:#8b62df}.poi-dot.daily{background:#ef9a39}
+.map-data-warning{margin-top:7px;padding:7px;border-radius:6px;background:#fff5e8;color:#8f6d3d;font-size:8px;line-height:1.4}
+.map-layer-panel+.map-legend{top:auto;bottom:14px}
+@media(max-width:760px){.map-layer-panel{width:190px;right:8px;top:8px;padding:8px}.map-layer-panel>button{padding:6px 4px}.map-layer-panel>button span{font-size:8px}}
+@media(max-width:520px){.map-layer-panel{width:174px}.map-layer-title small{display:none}.map-layer-panel>button{grid-template-columns:10px 1fr auto;gap:5px}.map-layer-panel>button span{font-size:7.5px}.map-layer-panel+.map-legend{display:none}}
