@@ -205,3 +205,8 @@
 .catalog-load-more .button{min-width:190px}
 .catalog-load-more>span{font-size:9px;font-weight:800;color:#8da0b3}
 @media(max-width:520px){.catalog-extra-filters{grid-template-columns:1fr}.catalog-load-more{flex-direction:column;gap:7px}.catalog-load-more .button{width:100%}}
+
+.active-filter-chips{display:flex;flex-wrap:wrap;gap:7px;margin:-2px 0 12px}
+.active-filter-chips button{display:inline-flex;align-items:center;gap:6px;border:1px solid #dce8f4;background:#fff;border-radius:999px;padding:7px 9px;color:#42627f;font-size:8.5px;font-weight:800}
+.active-filter-chips button:hover{background:#eef6ff;border-color:#b9d5f1}.active-filter-chips button span{font-size:13px;line-height:1;color:#7f95aa}
+.active-filter-chips .clear-all{border-color:transparent;background:transparent;color:#8a9db0}
