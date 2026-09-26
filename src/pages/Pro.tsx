@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
 import { DEMO_PRO_LEADS,leadAnalytics,loadPromotedIds,matchLeadToApartment,savePromotedIds,type ProLead } from '../lib/pro'
+import { loadSharedDemandProfile,sharedDemandProfileToLead } from '../lib/demandProfile'
 import { EmptyState,PageLoading } from '../components/Ui'
 import type { Apartment } from '../types'
 
@@ -17,6 +18,10 @@ export function Pro() {
   const [selectedId,setSelectedId]=useState('')
   const [promoted,setPromoted]=useState<string[]>(loadPromotedIds)
   const [unlocked,setUnlocked]=useState<string[]>([])
+  const sharedProfile=useMemo(() => loadSharedDemandProfile(),[])
+  const crmLeads=useMemo(() => sharedProfile?.consentToContact
+    ? [sharedDemandProfileToLead(sharedProfile),...DEMO_PRO_LEADS]
+    : DEMO_PRO_LEADS,[sharedProfile])
 
   useEffect(() => {
     api.mine()
@@ -30,11 +35,11 @@ export function Pro() {
 
   const selected=mine.find(item => item.id === selectedId) ?? mine[0] ?? null
   const matches=useMemo(() => selected
-    ? DEMO_PRO_LEADS
+    ? crmLeads
         .map(lead => matchLeadToApartment(lead,selected))
         .filter(match => match.lead.intent === 'buy')
         .sort((a,b) => b.score-a.score)
-    : [],[selected])
+    : [],[selected,crmLeads])
   const analytics=useMemo(() => leadAnalytics(DEMO_PRO_LEADS),[])
 
   function togglePromotion(id:string) {
@@ -57,7 +62,7 @@ export function Pro() {
           <p>Рабочий прототип B2B-модели. Здесь нет реальных платежей и реальных пользовательских контактов: лиды ниже синтетические, а контакт открывается только когда у лида стоит согласие.</p>
         </div>
         <div className="pro-hero-metrics">
-          <div><small>Демо-лидов</small><b>{analytics.leads}</b></div>
+          <div><small>CRM-лидов</small><b>{crmLeads.length}</b></div>
           <div><small>Покупка</small><b>{analytics.buyLeads}</b></div>
           <div><small>Аренда</small><b>{analytics.rentLeads}</b></div>
         </div>
@@ -87,15 +92,15 @@ export function Pro() {
             {matches.map(match => <article key={match.lead.id} className="pro-lead-card">
               <div className="pro-lead-avatar">{match.lead.name.slice(0,1)}</div>
               <div className="pro-lead-main">
-                <div className="pro-lead-title"><h3>{match.lead.name}</h3><span>{match.score}% match</span></div>
-                <p>{match.lead.intent === 'buy' ? `Покупка до ${price(match.lead.budgetMax)}` : `Аренда до ${price(match.lead.monthlyRentMax || 0)}/мес`} · {match.lead.roomsMin}–{match.lead.roomsMax} комн. · {match.lead.districts.join(', ')}</p>
+                <div className="pro-lead-title"><h3>{match.lead.name}</h3><span>{match.score}% match</span>{match.lead.source === 'local' && <em>Согласованный профиль</em>}</div>
+                <p>{match.lead.intent === 'buy' ? `Покупка до ${price(match.lead.budgetMax)}` : `Аренда до ${price(match.lead.monthlyRentMax || 0)}/мес`} · {match.lead.roomsMin}–{match.lead.roomsMax} комн. · {match.lead.districts.length ? match.lead.districts.join(', ') : 'любой район'}</p>
                 <div className="pro-lead-tags">{match.lead.priorities.map(priority => <span key={priority}>{priority}</span>)}</div>
                 <small>Работа: {match.lead.workLabel} · commute до {match.lead.maxCommuteMinutes} мин</small>
                 <div className="pro-match-reasons">{match.reasons.length ? match.reasons.map(reason => <span key={reason}><Check size={11}/>{reason}</span>) : <span>Совпадений по объявлению пока мало</span>}</div>
               </div>
               <div className="pro-lead-contact">
                 {!match.lead.consentToContact ? <><LockKeyhole size={18}/><b>Контакт закрыт</b><small>Нет согласия пользователя на передачу контакта</small></>
-                  : unlocked.includes(match.lead.id) ? <><Phone size={18}/><b>{match.lead.contact}</b><small>Демо-контакт · не реальный номер</small></>
+                  : unlocked.includes(match.lead.id) ? <><Phone size={18}/><b>{match.lead.contact}</b><small>{match.lead.source === 'local' ? 'Контакт из согласованного профиля этого браузера' : 'Демо-контакт · не реальный номер'}</small></>
                     : <><LockKeyhole size={18}/><b>Контакт доступен Pro</b><button type="button" onClick={() => unlock(match.lead)}>Открыть контакт</button></>}
               </div>
             </article>)}
