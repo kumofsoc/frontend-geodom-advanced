@@ -266,6 +266,8 @@ export function MapPanel({
       const body = [
         item.address ? `<span>${escapeHtml(item.address)}</span>` : '',
         item.source ? `<small>Источник: ${escapeHtml(item.source)}</small>` : '',
+        item.sourceUpdatedAt ? `<small>Обновлено у источника: ${escapeHtml(item.sourceUpdatedAt)}</small>` : '',
+        item.collectedAt ? `<small>Собрано GeoDom: ${escapeHtml(item.collectedAt)}</small>` : '',
         sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Открыть источник →</a>` : ''
       ].filter(Boolean).join('<br>')
 
