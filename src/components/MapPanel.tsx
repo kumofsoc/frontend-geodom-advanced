@@ -7,8 +7,13 @@ import { loadYandexMaps } from '../lib/yandexMaps'
 
 type WorkLocation = { lat:number; lon:number } | null
 type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
-const DISTRICT_CARD_MAX_ZOOM = 11
-const APARTMENT_PRICE_MIN_ZOOM = 12
+const CITY_OVERVIEW_MAX_ZOOM = 8
+const DISTRICT_CARD_MAX_ZOOM = 10
+const APARTMENT_CLUSTER_MIN_ZOOM = 11
+const APARTMENT_PRICE_MIN_ZOOM = 13
+const POI_MIN_ZOOM = 12
+const MAX_PRICE_PINS = 320
+const MAX_POI_MARKS = 1200
 
 const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
   { key:'education',label:'Школы и детсады',preset:'islands#blueIcon' },
@@ -35,6 +40,31 @@ function safeHttpUrl(value: string | null) {
 function score10(value: number | null) {
   if (value === null || !Number.isFinite(value)) return null
   return value > 10 ? value / 10 : value
+}
+
+type ViewportBounds = { minLat:number;maxLat:number;minLon:number;maxLon:number }
+
+function boundsFromYandex(value: unknown): ViewportBounds | null {
+  if (!Array.isArray(value) || value.length < 2) return null
+  const first = value[0]
+  const second = value[1]
+  if (!Array.isArray(first) || !Array.isArray(second)) return null
+  const lat1 = Number(first[0]); const lon1 = Number(first[1])
+  const lat2 = Number(second[0]); const lon2 = Number(second[1])
+  if (![lat1,lon1,lat2,lon2].every(Number.isFinite)) return null
+  return {
+    minLat:Math.min(lat1,lat2),
+    maxLat:Math.max(lat1,lat2),
+    minLon:Math.min(lon1,lon2),
+    maxLon:Math.max(lon1,lon2)
+  }
+}
+
+function withinViewport(lat:number,lon:number,bounds:ViewportBounds|null,padding=.18) {
+  if (!bounds) return true
+  const latPad=(bounds.maxLat-bounds.minLat)*padding
+  const lonPad=(bounds.maxLon-bounds.minLon)*padding
+  return lat >= bounds.minLat-latPad && lat <= bounds.maxLat+latPad && lon >= bounds.minLon-lonPad && lon <= bounds.maxLon+lonPad
 }
 
 function classifyGeoObject(item: GeoObject): PoiLayer | null {
@@ -75,9 +105,11 @@ export function MapPanel({
   const workHandler = useRef(onWorkLocation)
   const pickingRef = useRef(workPicking)
   const resizeObserver = useRef<ResizeObserver | null>(null)
+  const viewportTimer = useRef<number | null>(null)
   const fittedSignature = useRef('')
   const [ready,setReady] = useState(false)
   const [zoom,setZoom] = useState(11)
+  const [viewport,setViewport] = useState<ViewportBounds|null>(null)
   const [loadError,setLoadError] = useState('')
   const [layersOpen,setLayersOpen] = useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width:520px)').matches)
   const [layers,setLayers] = useState<Record<PoiLayer,boolean>>({
@@ -117,16 +149,21 @@ export function MapPanel({
         zoom:11,
         controls:['zoomControl','fullscreenControl']
       }, {
-        minZoom:7,
+        minZoom:3,
         maxZoom:19,
         suppressMapOpenBlock:true
       })
 
       instance.behaviors.enable(['drag','scrollZoom','dblClickZoom','multiTouch'])
-      instance.events.add('boundschange', (event:any) => {
-        const next = event.get('newZoom')
-        setZoom(typeof next === 'number' ? next : instance.getZoom())
-      })
+      const syncViewport = () => {
+        if (viewportTimer.current !== null) window.clearTimeout(viewportTimer.current)
+        viewportTimer.current = window.setTimeout(() => {
+          setZoom(instance.getZoom())
+          setViewport(boundsFromYandex(instance.getBounds()))
+        },90)
+      }
+      instance.events.add('boundschange', syncViewport)
+      syncViewport()
       instance.events.add('click', (event:any) => {
         if (!pickingRef.current) return
         const coords = event.get('coords')
@@ -147,6 +184,8 @@ export function MapPanel({
       cancelled = true
       resizeObserver.current?.disconnect()
       resizeObserver.current = null
+      if (viewportTimer.current !== null) window.clearTimeout(viewportTimer.current)
+      viewportTimer.current = null
       map.current?.destroy()
       map.current = null
       ymapsRef.current = null
@@ -161,7 +200,21 @@ export function MapPanel({
     instance.geoObjects.removeAll()
     const valid = items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude))
     const groups = new Map<string,Apartment[]>()
+    for (const item of valid) groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
     const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
+    const apartmentMode = zoom <= CITY_OVERVIEW_MAX_ZOOM
+      ? 'hidden'
+      : zoom < APARTMENT_CLUSTER_MIN_ZOOM
+        ? 'hidden'
+        : zoom < APARTMENT_PRICE_MIN_ZOOM
+          ? 'cluster'
+          : 'prices'
+    const visibleApartments = valid.filter(item => {
+      const point = validCoordinate(item.latitude,item.longitude)
+      return !!point && withinViewport(point.lat,point.lon,viewport)
+    })
+    const useApartmentClusters = apartmentMode === 'cluster' || (apartmentMode === 'prices' && visibleApartments.length > MAX_PRICE_PINS)
+    const apartmentRenderSet = apartmentMode === 'hidden' ? [] : visibleApartments
 
     if (signature && signature !== fittedSignature.current && !workPicking) {
       const points = valid
@@ -180,41 +233,68 @@ export function MapPanel({
       fittedSignature.current = signature
     }
 
-    for (const item of valid) {
-      const point = validCoordinate(item.latitude,item.longitude)
-      if (!point) continue
-      groups.set(item.district.name,[...(groups.get(item.district.name) || []),item])
+    if (apartmentMode !== 'hidden') {
+      if (useApartmentClusters) {
+        const apartmentMarks:any[] = []
+        for (const item of apartmentRenderSet) {
+          const point = validCoordinate(item.latitude,item.longitude)
+          if (!point) continue
+          const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
+          const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
+          const active = activeByFilter && activeByDistrict
+          const personalScore = scoreByApartment?.get(String(item.id))
+          const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
+            ? personalScore
+            : score10(item.recommendation.score)
 
-      const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
-      const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
-      const active = activeByFilter && activeByDistrict
-      const compactApartment = zoom < APARTMENT_PRICE_MIN_ZOOM
-      const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
-      const personalScore = scoreByApartment?.get(String(item.id))
-      const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
-        ? personalScore
-        : score10(item.recommendation.score)
-      const layout = ymaps.templateLayoutFactory.createClass(
-        compactApartment
-          ? `<div class="yandex-apartment-dot ${active ? '' : 'muted'}"></div>`
-          : `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
-      )
-      const placemark = new ymaps.Placemark(
-        [point.lat,point.lon],
-        {
-          balloonContentHeader:escapeHtml(item.title),
-          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
-        },
-        compactApartment
-          ? {
-              iconLayout:layout,
-              iconShape:{ type:'Circle',coordinates:[0,0],radius:6 },
-              interactiveZIndex:false,
-              zIndex:480,
-              zIndexHover:480,
-              zIndexActive:500
+          apartmentMarks.push(new ymaps.Placemark(
+            [point.lat,point.lon],
+            {
+              balloonContentHeader:escapeHtml(item.title),
+              balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+            },
+            {
+              preset:active ? 'islands#blueCircleIcon' : 'islands#grayCircleIcon',
+              zIndex:500
             }
-          : {
+          ))
+        }
+
+        if (apartmentMarks.length) {
+          const clusterer = new ymaps.Clusterer({
+            preset:'islands#blueClusterIcons',
+            groupByCoordinates:false,
+            clusterDisableClickZoom:false,
+            clusterHideIconOnBalloonOpen:false,
+            geoObjectHideIconOnBalloonOpen:false,
+            gridSize:72,
+            minClusterSize:3
+          })
+          clusterer.add(apartmentMarks)
+          instance.geoObjects.add(clusterer)
+        }
+      } else {
+        for (const item of apartmentRenderSet) {
+          const point = validCoordinate(item.latitude,item.longitude)
+          if (!point) continue
+          const activeByFilter = !activeApartmentIds || activeApartmentIds.has(String(item.id))
+          const activeByDistrict = !selectedDistrict || selectedDistrict === item.district.name
+          const active = activeByFilter && activeByDistrict
+          const amount = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(item.price/1000000)
+          const personalScore = scoreByApartment?.get(String(item.id))
+          const displayedScore = typeof personalScore === 'number' && Number.isFinite(personalScore)
+            ? personalScore
+            : score10(item.recommendation.score)
+          const layout = ymaps.templateLayoutFactory.createClass(
+            `<div class="yandex-price-pin ${active ? '' : 'muted'}"><span>${amount} млн ₽</span></div>`
+          )
+          const placemark = new ymaps.Placemark(
+            [point.lat,point.lon],
+            {
+              balloonContentHeader:escapeHtml(item.title),
+              balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong>${displayedScore === null ? '' : `<br><b>Персональная оценка: ${displayedScore.toFixed(1)} / 10</b>`}<br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+            },
+            {
               iconLayout:layout,
               iconShape:{ type:'Rectangle',coordinates:[[-54,-36],[54,2]] },
               interactiveZIndex:false,
@@ -222,12 +302,38 @@ export function MapPanel({
               zIndexHover:900,
               zIndexActive:920
             }
+          )
+          instance.geoObjects.add(placemark)
+        }
+      }
+    }
+
+    if (zoom <= CITY_OVERVIEW_MAX_ZOOM && valid.length) {
+      const points = valid
+        .map(item => validCoordinate(item.latitude,item.longitude))
+        .filter((point):point is { lat:number;lon:number } => point !== null)
+      const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
+      const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
+      const layout = ymaps.templateLayoutFactory.createClass(
+        `<div class="yandex-city-summary"><strong>Красноярск</strong><span>${valid.length} квартир</span><small>Приблизьте карту</small></div>`
       )
-      instance.geoObjects.add(placemark)
+      const cityPlacemark = new ymaps.Placemark(
+        [lat,lon],
+        {},
+        {
+          iconLayout:layout,
+          iconShape:{ type:'Rectangle',coordinates:[[-70,-70],[70,5]] },
+          interactiveZIndex:false,
+          zIndex:1100,
+          zIndexHover:1100
+        }
+      )
+      cityPlacemark.events.add('click', () => instance.setCenter([lat,lon],10,{ checkZoomRange:true,duration:260 }))
+      instance.geoObjects.add(cityPlacemark)
     }
 
     const compactDistricts = zoom > DISTRICT_CARD_MAX_ZOOM
-    for (const [district,houses] of groups) {
+    if (zoom > CITY_OVERVIEW_MAX_ZOOM) for (const [district,houses] of groups) {
       const points = houses
         .map(home => validCoordinate(home.latitude,home.longitude))
         .filter((point):point is { lat:number; lon:number } => point !== null)
@@ -268,7 +374,11 @@ export function MapPanel({
     }
 
     const poiMarks:any[] = []
-    for (const item of geoObjects) {
+    const eligiblePoi = zoom >= POI_MIN_ZOOM
+      ? geoObjects.filter(item => withinViewport(item.lat,item.lon,viewport))
+      : []
+    const visiblePoi = eligiblePoi.slice(0,MAX_POI_MARKS)
+    for (const item of visiblePoi) {
       const layer = classifyGeoObject(item)
       if (!layer || !layers[layer]) continue
       const meta = layerMeta.find(candidate => candidate.key === layer)
@@ -323,7 +433,7 @@ export function MapPanel({
         instance.geoObjects.add(workPlacemark)
       }
     }
-  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds,scoreByApartment,layers])
+  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,viewport,activeApartmentIds,scoreByApartment,layers])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
@@ -335,7 +445,15 @@ export function MapPanel({
         <Layers3 size={15}/><b>Слои на карте</b><small>{validApartmentCount} кв. · {geoObjects.length} POI</small><ChevronDown size={14}/>
       </button>
       {layersOpen && <>
-        <div className="map-lod-status">{zoom <= DISTRICT_CARD_MAX_ZOOM ? 'Обзор районов · приблизьте для цен квартир' : 'Цены квартир · районы показаны точками'}</div>
+        <div className="map-lod-status">{
+          zoom <= CITY_OVERVIEW_MAX_ZOOM
+            ? 'Обзор города · квартиры и POI скрыты'
+            : zoom < APARTMENT_CLUSTER_MIN_ZOOM
+              ? 'Районы · квартиры появятся при приближении'
+              : useApartmentClusters
+                ? `Кластеры квартир · ${visibleApartments.length} в текущей области`
+                : `Цены квартир · ${visibleApartments.length} в текущей области`
+        }</div>
         {layerMeta.map(layer => <button
           type="button"
           key={layer.key}
@@ -348,6 +466,7 @@ export function MapPanel({
           <small>{layerCounts[layer.key]}</small>
         </button>)}
         {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
+        {eligiblePoi.length > MAX_POI_MARKS && <div className="map-data-warning">POI слишком много: показываем ближайшие {MAX_POI_MARKS} объектов в окне</div>}
       </>}
     </div>
 
