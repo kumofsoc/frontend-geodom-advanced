@@ -15,6 +15,7 @@ import type { Apartment, CatalogFilters, CatalogSort, RecommendationRequest, Rec
 import { useGeoDomStore } from '../store/useGeoDomStore'
 
 const CitySignal = lazy(() => import('../components/CitySignal'))
+const CATALOG_PAGE_SIZE = 24
 
 export function Catalog() {
   const [items,setItems] = useState<Apartment[]>([])
@@ -38,6 +39,7 @@ export function Catalog() {
   const [recommendationLoading,setRecommendationLoading] = useState(() => !loadLastRecommendation())
   const [recommendationError,setRecommendationError] = useState('')
   const [validationError,setValidationError] = useState('')
+  const [shownCount,setShownCount] = useState(CATALOG_PAGE_SIZE)
   const priorityRecalcReady = useRef(false)
 
   useEffect(() => {
@@ -87,8 +89,14 @@ export function Catalog() {
   },[prioritySignature])
 
   const districts = useMemo(() => [...new Set(items.map(x => x.district.name))].filter(x => x !== 'Уточняется').sort(),[items])
+  const buildingTypes = useMemo(() => [...new Set(items.map(item => item.building_type).filter((value):value is string => !!value))].sort(),[items])
   const visible = useMemo(() => filterApartments(items,filters),[items,filters])
+  const shownApartments = useMemo(() => visible.slice(0,shownCount),[visible,shownCount])
   const visibleIds = useMemo(() => new Set(visible.map(item => String(item.id))),[visible])
+  useEffect(() => {
+    setShownCount(CATALOG_PAGE_SIZE)
+  },[filters])
+
   const personalScores = useMemo(() => new Map(
     (response?.items ?? []).map(item => [String(item.apartment_id),item.score] as const)
   ),[response])
@@ -178,7 +186,7 @@ export function Catalog() {
     void recommend(defaultPreferences)
   }
 
-  const activeCount = Number(!!filters.district)+Number(!!filters.maxPrice)+Number(!!filters.rooms)
+  const activeCount = Number(!!filters.district)+Number(!!filters.maxPrice)+Number(!!filters.rooms)+Number(!!filters.minArea)+Number(!!filters.yearFrom)+Number(!!filters.buildingType)+Number(filters.onlyWithPhotos)
 
   return <div className="dashboard-page">
     <div className="shell dashboard-grid">
@@ -190,6 +198,7 @@ export function Catalog() {
         error={validationError}
         filters={filters}
         districts={districts}
+        buildingTypes={buildingTypes}
         onFilter={change}
         onReset={resetPreferences}
         open={filtersOpen}
@@ -261,7 +270,7 @@ export function Catalog() {
         <Reveal>
         <section className="listings-section" id="catalog">
           <div className="dashboard-section-title listings-title">
-            <div><h2>Все <span>квартиры</span></h2><p>{loading ? 'Загружаем предложения…' : `${visible.length} предложений в каталоге`}</p></div>
+            <div><h2>Все <span>квартиры</span></h2><p>{loading ? 'Загружаем предложения…' : `${visible.length} предложений · показано ${Math.min(shownCount,visible.length)}`}</p></div>
             <div className="listings-actions">
               <button className="mobile-filter-button" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17}/> Параметры {activeCount > 0 && <b>{activeCount}</b>}</button>
               <label htmlFor="sort">Сортировка</label>
@@ -281,7 +290,13 @@ export function Catalog() {
             : error
               ? <EmptyState title="Не удалось загрузить квартиры" message={error} action={<button className="button dark" onClick={() => window.location.reload()}>Повторить</button>}/>
               : visible.length
-                ? <div className="card-grid">{visible.map((item,index) => <ApartmentCard item={item} index={index} key={item.id}/>)}</div>
+                ? <>
+                    <div className="card-grid">{shownApartments.map((item,index) => <ApartmentCard item={item} index={index} key={item.id}/>)}</div>
+                    {shownCount < visible.length && <div className="catalog-load-more">
+                      <button type="button" className="button light" onClick={() => setShownCount(count => count+CATALOG_PAGE_SIZE)}>Показать ещё {Math.min(CATALOG_PAGE_SIZE,visible.length-shownCount)}</button>
+                      <span>{shownCount} / {visible.length}</span>
+                    </div>}
+                  </>
                 : <EmptyState title="Ничего не нашлось" message="Попробуйте расширить бюджет или выбрать другой район." action={<button className="button dark" onClick={reset}>Сбросить фильтры</button>}/>}
         </section>
         </Reveal>
