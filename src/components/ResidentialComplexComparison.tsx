@@ -3,6 +3,7 @@ import { ArrowUpRight,Building2,Check,GitCompareArrows } from 'lucide-react'
 import { api } from '../lib/api'
 import { price } from '../lib/catalog'
 import { DataFreshness,SourceBadge,WarningBanner } from './DataTrust'
+import { loadSelectedComplexIds,saveSelectedComplexIds } from '../lib/decisionSnapshot'
 import type { ResidentialComplex } from '../types'
 
 function cell(value:string|number|null|undefined,fallback='Нет данных') {
@@ -11,7 +12,7 @@ function cell(value:string|number|null|undefined,fallback='Нет данных')
 
 export function ResidentialComplexComparison() {
   const [items,setItems]=useState<ResidentialComplex[]>([])
-  const [selected,setSelected]=useState<string[]>([])
+  const [selected,setSelected]=useState<string[]>(loadSelectedComplexIds)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
 
@@ -21,7 +22,13 @@ export function ResidentialComplexComparison() {
       .then(rows => {
         if (controller.signal.aborted) return
         setItems(rows)
-        setSelected(rows.slice(0,Math.min(3,rows.length)).map(item => item.id))
+        setSelected(current => {
+          const available=current.filter(id => rows.some(item => item.id === id))
+          if (available.length) return available
+          const initial=rows.slice(0,Math.min(3,rows.length)).map(item => item.id)
+          saveSelectedComplexIds(initial)
+          return initial
+        })
       })
       .catch(err => {
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Не удалось загрузить ЖК')
@@ -33,7 +40,11 @@ export function ResidentialComplexComparison() {
   const selectedItems=useMemo(() => selected.map(id => items.find(item => item.id === id)).filter((item):item is ResidentialComplex => !!item),[selected,items])
 
   function toggle(id:string) {
-    setSelected(current => current.includes(id) ? current.filter(value => value !== id) : current.length >= 3 ? current : [...current,id])
+    setSelected(current => {
+      const next=current.includes(id) ? current.filter(value => value !== id) : current.length >= 3 ? current : [...current,id]
+      saveSelectedComplexIds(next)
+      return next
+    })
   }
 
   return <section className="complex-comparison-section">
