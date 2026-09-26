@@ -270,7 +270,7 @@ export function Catalog() {
         <Reveal>
         <div className="dashboard-section-title">
           <div><h2>Районы <span>Красноярска</span></h2><p>Обзор квартир и инфраструктуры по районам</p></div>
-          <span className="mini-label">{isDemo ? 'ДЕМОНСТРАЦИОННЫЕ ОЦЕНКИ' : 'ОБЗОР РАЙОНОВ'}</span>
+          <Link className="districts-all-link" to="/districts">Все 7 районов <ArrowRight size={14}/></Link>
         </div>
         <div className="district-cards">{districtCards.map((d,i) => <button className={`district-card ${filters.district === d.name ? 'chosen' : ''}`} key={d.name} onClick={() => pickDistrict(d.name)}>
           <div className="district-image">{d.photo && <img src={d.photo} alt=""/>}<span>{i === 0 ? '✦ Высокая оценка' : `${d.count} предложений`}</span></div>
