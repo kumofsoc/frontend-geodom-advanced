@@ -1,13 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Apartment } from '../types'
 import { price } from '../lib/catalog'
-import { validCoordinate } from '../lib/dataSanitizers'
+import { validCoordinate, type GeoObject } from '../lib/dataSanitizers'
 import { loadYandexMaps } from '../lib/yandexMaps'
 
 type WorkLocation = { lat:number; lon:number } | null
+type PoiLayer = 'education' | 'parks' | 'healthcare' | 'transport' | 'daily'
+
+const layerMeta: Array<{ key:PoiLayer; label:string; preset:string }> = [
+  { key:'education',label:'Школы и детсады',preset:'islands#blueIcon' },
+  { key:'parks',label:'Парки и зелень',preset:'islands#greenIcon' },
+  { key:'healthcare',label:'Медицина',preset:'islands#redIcon' },
+  { key:'transport',label:'Транспорт',preset:'islands#violetIcon' },
+  { key:'daily',label:'Магазины и сервисы',preset:'islands#orangeIcon' }
+]
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char] || char))
+}
+
+function safeHttpUrl(value: string | null) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
+  } catch {
+    return null
+  }
 }
 
 function score10(value: number | null) {
@@ -15,8 +34,19 @@ function score10(value: number | null) {
   return value > 10 ? value / 10 : value
 }
 
+function classifyGeoObject(item: GeoObject): PoiLayer | null {
+  const value = `${item.category} ${item.subcategory || ''}`.toLowerCase()
+  if (/(school|kindergarten|college|university|education|школ|сад|образован)/.test(value)) return 'education'
+  if (/(park|garden|green|forest|recreation|парк|сквер|зел)/.test(value)) return 'parks'
+  if (/(health|hospital|clinic|pharmacy|doctor|мед|больниц|поликлин|аптек)/.test(value)) return 'healthcare'
+  if (/(transport|bus|tram|rail|station|stop|metro|транспорт|останов|вокзал)/.test(value)) return 'transport'
+  if (/(shop|supermarket|market|cafe|restaurant|sport|fitness|amenity|магаз|кафе|ресторан|спорт)/.test(value)) return 'daily'
+  return null
+}
+
 export function MapPanel({
   items,
+  geoObjects,
   selectedDistrict,
   onDistrict,
   workLocation,
@@ -25,6 +55,7 @@ export function MapPanel({
   activeApartmentIds
 }:{
   items:Apartment[]
+  geoObjects:GeoObject[]
   selectedDistrict:string
   onDistrict:(district:string)=>void
   workLocation:WorkLocation
@@ -43,10 +74,31 @@ export function MapPanel({
   const [ready,setReady] = useState(false)
   const [zoom,setZoom] = useState(11)
   const [loadError,setLoadError] = useState('')
+  const [layers,setLayers] = useState<Record<PoiLayer,boolean>>({
+    education:true,
+    parks:true,
+    healthcare:true,
+    transport:true,
+    daily:false
+  })
 
   districtHandler.current = onDistrict
   workHandler.current = onWorkLocation
   pickingRef.current = workPicking
+
+  const layerCounts = useMemo(() => {
+    const counts: Record<PoiLayer,number> = { education:0,parks:0,healthcare:0,transport:0,daily:0 }
+    for (const item of geoObjects) {
+      const layer = classifyGeoObject(item)
+      if (layer) counts[layer] += 1
+    }
+    return counts
+  },[geoObjects])
+
+  const validApartmentCount = useMemo(
+    () => items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude)).length,
+    [items]
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -63,8 +115,8 @@ export function MapPanel({
         maxZoom:19,
         suppressMapOpenBlock:true
       })
-      instance.behaviors.enable(['drag','scrollZoom','dblClickZoom','multiTouch'])
 
+      instance.behaviors.enable(['drag','scrollZoom','dblClickZoom','multiTouch'])
       instance.events.add('boundschange', (event:any) => {
         const next = event.get('newZoom')
         setZoom(typeof next === 'number' ? next : instance.getZoom())
@@ -104,11 +156,13 @@ export function MapPanel({
     const valid = items.filter(item => item.status === 'published' && validCoordinate(item.latitude,item.longitude))
     const groups = new Map<string,Apartment[]>()
     const signature = valid.map(item => `${item.id}:${item.latitude}:${item.longitude}`).sort().join('|')
+
     if (signature && signature !== fittedSignature.current && !workPicking) {
       const bounds = valid
         .map(item => validCoordinate(item.latitude,item.longitude))
         .filter((point):point is { lat:number; lon:number } => point !== null)
         .map(point => [point.lat,point.lon])
+
       if (bounds.length > 1) instance.setBounds(bounds,{ checkZoomRange:true,zoomMargin:[48,48] })
       else if (bounds.length === 1) instance.setCenter(bounds[0],13)
       fittedSignature.current = signature
@@ -131,11 +185,11 @@ export function MapPanel({
         {
           hintContent:escapeHtml(item.title),
           balloonContentHeader:escapeHtml(item.title),
-          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
+          balloonContentBody:`<strong>${escapeHtml(price(item.price))}</strong><br><span>${escapeHtml(item.address)}</span><br><a href="/apartments/${encodeURIComponent(item.id)}">Открыть квартиру →</a>`
         },
         {
           iconLayout:layout,
-          iconShape:{ type:'Rectangle', coordinates:[[-52,-34],[52,0]] },
+          iconShape:{ type:'Rectangle',coordinates:[[-52,-34],[52,0]] },
           zIndex:500
         }
       )
@@ -144,17 +198,20 @@ export function MapPanel({
 
     const compactDistricts = zoom >= 13
     for (const [district,houses] of groups) {
-      const points = houses.map(home => validCoordinate(home.latitude,home.longitude)).filter((point):point is { lat:number; lon:number } => point !== null)
+      const points = houses
+        .map(home => validCoordinate(home.latitude,home.longitude))
+        .filter((point):point is { lat:number; lon:number } => point !== null)
       if (!points.length) continue
+
       const lat = points.reduce((sum,point) => sum+point.lat,0)/points.length
       const lon = points.reduce((sum,point) => sum+point.lon,0)/points.length
       const scores = houses.map(home => score10(home.recommendation.score)).filter((value):value is number => value !== null)
       const average = scores.length ? scores.reduce((sum,value) => sum+value,0)/scores.length : null
       const active = selectedDistrict === district
-
       const html = compactDistricts
         ? `<div class="yandex-district-dot ${active ? 'active' : ''}" title="${escapeHtml(district)}"></div>`
         : `<div class="yandex-district-pin ${active ? 'active' : ''}"><span>${escapeHtml(district)}</span>${average === null ? '' : `<b>${average.toFixed(1)}</b>`}</div>`
+
       const layout = ymaps.templateLayoutFactory.createClass(html)
       const placemark = new ymaps.Placemark(
         [lat,lon],
@@ -162,8 +219,8 @@ export function MapPanel({
         {
           iconLayout:layout,
           iconShape:compactDistricts
-            ? { type:'Circle', coordinates:[0,0], radius:11 }
-            : { type:'Rectangle', coordinates:[[-62,-62],[62,0]] },
+            ? { type:'Circle',coordinates:[0,0],radius:11 }
+            : { type:'Rectangle',coordinates:[[-62,-62],[62,0]] },
           zIndex:1000
         }
       )
@@ -171,13 +228,51 @@ export function MapPanel({
       instance.geoObjects.add(placemark)
     }
 
+    const poiMarks:any[] = []
+    for (const item of geoObjects) {
+      const layer = classifyGeoObject(item)
+      if (!layer || !layers[layer]) continue
+      const meta = layerMeta.find(candidate => candidate.key === layer)
+      if (!meta) continue
+      const sourceUrl = safeHttpUrl(item.sourceUrl)
+      const body = [
+        item.address ? `<span>${escapeHtml(item.address)}</span>` : '',
+        item.source ? `<small>Источник: ${escapeHtml(item.source)}</small>` : '',
+        sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Открыть источник →</a>` : ''
+      ].filter(Boolean).join('<br>')
+
+      poiMarks.push(new ymaps.Placemark(
+        [item.lat,item.lon],
+        {
+          hintContent:escapeHtml(item.name),
+          balloonContentHeader:escapeHtml(item.name),
+          balloonContentBody:body || 'Данные об объекте инфраструктуры'
+        },
+        {
+          preset:meta.preset,
+          zIndex:220
+        }
+      ))
+    }
+
+    if (poiMarks.length) {
+      const clusterer = new ymaps.Clusterer({
+        groupByCoordinates:false,
+        clusterDisableClickZoom:false,
+        clusterHideIconOnBalloonOpen:false,
+        geoObjectHideIconOnBalloonOpen:false
+      })
+      clusterer.add(poiMarks)
+      instance.geoObjects.add(clusterer)
+    }
+
     if (workLocation) {
       const point = validCoordinate(workLocation.lat,workLocation.lon)
       if (point) {
         const workPlacemark = new ymaps.Placemark(
           [point.lat,point.lon],
-          { iconCaption:'Работа', hintContent:'Место работы', balloonContent:'Выбранное место работы' },
-          { preset:'islands#redIcon', draggable:true, zIndex:1500 }
+          { iconCaption:'Работа',hintContent:'Место работы',balloonContent:'Выбранное место работы' },
+          { preset:'islands#redIcon',draggable:true,zIndex:1500 }
         )
         workPlacemark.events.add('dragend', () => {
           const coords = workPlacemark.geometry.getCoordinates()
@@ -187,12 +282,33 @@ export function MapPanel({
         instance.geoObjects.add(workPlacemark)
       }
     }
-  },[items,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds])
+  },[items,geoObjects,selectedDistrict,workLocation,workPicking,ready,zoom,activeApartmentIds,layers])
 
   return <div className={`map-wrapper yandex-map-wrapper ${workPicking ? 'work-picking' : ''}`}>
     <div ref={element} className="map-canvas" aria-label="Яндекс Карта квартир Красноярска"/>
     {loadError && <div className="map-load-error"><b>Яндекс Карта недоступна</b><span>{loadError}</span><small>Проверьте VITE_YANDEX_MAPS_API_KEY и доступ к api-maps.yandex.ru.</small></div>}
     {workPicking && <div className="work-pick-hint">Нажмите на карте в точке, где находится работа</div>}
-    <div className="map-legend"><span><i className="legend-dot blue"/> Квартиры</span><span><i className="legend-dot green"/> Районы</span><span><i className="legend-dot red"/> Работа</span></div>
+
+    <div className="map-layer-panel" aria-label="Слои инфраструктуры">
+      <div className="map-layer-title"><b>Слои на карте</b><small>{geoObjects.length} объектов</small></div>
+      {layerMeta.map(layer => <button
+        type="button"
+        key={layer.key}
+        className={layers[layer.key] ? 'active' : ''}
+        onClick={() => setLayers(current => ({ ...current,[layer.key]:!current[layer.key] }))}
+        aria-pressed={layers[layer.key]}
+      >
+        <i className={`poi-dot ${layer.key}`}/>
+        <span>{layer.label}</span>
+        <small>{layerCounts[layer.key]}</small>
+      </button>)}
+      {items.length !== validApartmentCount && <div className="map-data-warning">{items.length-validApartmentCount} квартир без валидных координат скрыто</div>}
+    </div>
+
+    <div className="map-legend">
+      <span><i className="legend-dot blue"/> Квартиры</span>
+      <span><i className="legend-dot green"/> Районы</span>
+      <span><i className="legend-dot red"/> Работа</span>
+    </div>
   </div>
 }
