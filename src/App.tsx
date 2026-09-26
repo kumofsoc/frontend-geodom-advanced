@@ -3,6 +3,7 @@ import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowUpRight, House, Menu, Plus, X } from 'lucide-react'
 import { api, isDemo } from './lib/api'
 import { PageLoading } from './components/Ui'
+import { AppErrorBoundary } from './components/AppErrorBoundary'
 import { useGeoDomStore } from './store/useGeoDomStore'
 import './styles.css'
 
@@ -27,5 +28,5 @@ export default function App() {
     if (sessionUser) setUser(sessionUser)
     api.currentUser().then(setUser).catch(() => setUser(null))
   }, [setUser])
-  return <div className="app"><Header/>{isDemo && <div className="demo-banner"><span className="shell">ДЕМО-РЕЖИМ <span>·</span> Примерные квартиры и проекты. Для реальных данных подключите FastAPI.</span></div>}<main><Suspense fallback={<PageLoading/>}><Routes><Route path="/" element={<Catalog/>}/><Route path="/apartments/:id" element={<Detail/>}/><Route path="/login" element={<Auth mode="login"/>}/><Route path="/register" element={<Auth mode="register"/>}/><Route path="/account" element={<RequireAuth><Account/></RequireAuth>}/><Route path="/new" element={<RequireAuth><ListingForm/></RequireAuth>}/><Route path="/apartments/:id/edit" element={<RequireAuth><ListingForm/></RequireAuth>}/><Route path="*" element={<div className="shell not-found"><span>404</span><h1>Такой страницы нет</h1><Link className="button dark" to="/">Вернуться к квартирам</Link></div>}/></Routes></Suspense></main><Footer/></div>
+  return <div className="app"><Header/>{isDemo && <div className="demo-banner"><span className="shell">ДЕМО-РЕЖИМ <span>·</span> Примерные квартиры и проекты. Для реальных данных подключите FastAPI.</span></div>}<main><AppErrorBoundary><Suspense fallback={<PageLoading/>}><Routes><Route path="/" element={<Catalog/>}/><Route path="/apartments/:id" element={<Detail/>}/><Route path="/login" element={<Auth mode="login"/>}/><Route path="/register" element={<Auth mode="register"/>}/><Route path="/account" element={<RequireAuth><Account/></RequireAuth>}/><Route path="/new" element={<RequireAuth><ListingForm/></RequireAuth>}/><Route path="/apartments/:id/edit" element={<RequireAuth><ListingForm/></RequireAuth>}/><Route path="*" element={<div className="shell not-found"><span>404</span><h1>Такой страницы нет</h1><Link className="button dark" to="/">Вернуться к квартирам</Link></div>}/></Routes></Suspense></AppErrorBoundary></main><Footer/></div>
 }
