@@ -77,3 +77,23 @@ Apartment detail contains two decision tools:
 2. buy-vs-rent scenario model.
 
 Neither tool is a bank offer or personal financial advice. Public bank terms are volatile, so every offer keeps a source and update date and should eventually be replaced by a maintained backend/provider feed.
+
+
+## End-to-end demand consent demo
+
+The frontend now connects the B2C search profile to the Pro CRM without silently sharing it.
+
+In the authenticated account page a user can:
+
+- review the current GeoDom search snapshot (budget, district, rooms and commute);
+- provide a contact channel;
+- explicitly opt in to contact sharing;
+- update the shared profile when search parameters change;
+- revoke consent without deleting the private profile;
+- delete the local shared profile entirely.
+
+Only an opted-in local profile is added to the Pro CRM demo. The CRM can then match that profile to an agent's own listing and move it through a local pipeline:
+
+`new → contacted → viewing → won/lost`.
+
+This is still browser-local. A production implementation needs server-side consent records, consent versioning, audit timestamps, access control, lead ownership, revocation propagation and retention rules.
