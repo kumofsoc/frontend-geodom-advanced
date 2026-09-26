@@ -12,6 +12,7 @@ type ApartmentPageParams={
   minPrice?:number
   maxPrice?:number
   rooms?:number
+  districtId?:string|number
   signal?:AbortSignal
 }
 
@@ -124,6 +125,7 @@ export const apartmentsApi={
     if (params.minPrice) search.set('min_price',String(params.minPrice))
     if (params.maxPrice) search.set('max_price',String(params.maxPrice))
     if (params.rooms && params.rooms < 4) search.set('rooms',String(params.rooms))
+    if (params.districtId) search.set('district_id',String(params.districtId))
     const raw=await request<{items:RawApartment[];limit?:number;offset?:number}>(`/api/v1/apartments?${search}`,{signal:params.signal})
     const items=(raw.items || []).map(normalizeApartment)
     return {items,limit:Number(raw.limit ?? limit),offset:Number(raw.offset ?? offset),hasMore:items.length === limit}
