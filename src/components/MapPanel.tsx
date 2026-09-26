@@ -329,15 +329,23 @@ export function MapPanel({
         {
           iconLayout:layout,
           iconShape:{ type:'Rectangle',coordinates:[[-60,-38],[60,5]] },
-          interactiveZIndex:false,
+          interactiveZIndex:true,
           zIndex:900,
-          zIndexHover:900,
-          zIndexActive:2500
+          zIndexHover:12000,
+          zIndexActive:13000
         }
       )
-      placemark.events.add('mouseenter',() => placemark.options.set('zIndex',2400))
-      placemark.events.add('mouseleave',() => placemark.options.set('zIndex',900))
-      placemark.events.add('balloonopen',() => placemark.options.set('zIndex',2500))
+      placemark.events.add('mouseenter',() => placemark.options.set({
+        zIndex:12000,
+        zIndexHover:12000,
+        zIndexActive:13000
+      }))
+      placemark.events.add('mouseleave',() => placemark.options.set({
+        zIndex:900,
+        zIndexHover:12000,
+        zIndexActive:13000
+      }))
+      placemark.events.add('balloonopen',() => placemark.options.set('zIndex',13000))
       placemark.events.add('balloonclose',() => placemark.options.set('zIndex',900))
       collection.add(placemark)
     }
@@ -394,12 +402,12 @@ export function MapPanel({
         const placemark=new ymaps.Placemark([lat,lon],{ hintContent:escapeHtml(district) },{
           iconLayout:layout,
           iconShape:compactDistricts
-            ? { type:'Circle',coordinates:[0,0],radius:11 }
-            : { type:'Rectangle',coordinates:[[-62,-62],[62,0]] },
-          interactiveZIndex:false,
+            ? { type:'Circle',coordinates:[0,0],radius:9 }
+            : { type:'Rectangle',coordinates:[[-48,-48],[48,0]] },
+          interactiveZIndex:true,
           zIndex:compactDistricts ? 620 : 1050,
-          zIndexHover:compactDistricts ? 620 : 1050,
-          zIndexActive:compactDistricts ? 640 : 1070
+          zIndexHover:compactDistricts ? 1800 : 3200,
+          zIndexActive:compactDistricts ? 1900 : 3300
         })
         placemark.events.add('click',() => {
           districtHandler.current(district)
